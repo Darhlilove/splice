@@ -1,0 +1,14 @@
+{
+  "name": "@splice/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "next-themes": "^0.4.6"
+  }
+}

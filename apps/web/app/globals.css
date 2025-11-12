@@ -1,0 +1,16 @@
+/* Tailwind CSS v4 - Must be first */
+@import "tailwindcss";
+
+/* HeroUI v3 styles - Must be after Tailwind */
+@import "@heroui/styles";
+
+/* Custom button styles with rounded corners */
+.button,
+button[class*="button"] {
+  border-radius: 9999px !important;
+}
+
+/* Ensure all HeroUI buttons have rounded corners */
+[class*="button"] {
+  border-radius: 9999px !important;
+}
