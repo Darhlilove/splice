@@ -8,3 +8,5 @@
 export { parseOpenAPISpec } from "./parser.js";
 // Export error class
 export { ParserError } from "./types.js";
+// Export store functions
+export { generateSpecId, saveSpec, getSpec, deleteSpec, clearAllSpecs, getStoreSize, getAllSpecIds, } from "./store.js";

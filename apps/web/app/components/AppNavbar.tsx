@@ -1,6 +1,5 @@
 "use client";
 
-import { Link } from "@heroui/react";
 import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -26,13 +25,14 @@ export function AppNavbar() {
   return (
     <nav className="border-b border-border bg-background/70 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-        <Link asChild>
-          <NextLink href="/" className="font-bold text-2xl no-underline">
-            <span className="bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-              Splice
-            </span>
-          </NextLink>
-        </Link>
+        <NextLink
+          href="/"
+          className="font-logo font-bold text-2xl no-underline"
+        >
+          <span className="bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+            Splice
+          </span>
+        </NextLink>
         <div className="flex items-center gap-2">
           <div className="hidden sm:flex gap-2">
             {navItems.map((item) => {

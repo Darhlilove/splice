@@ -1,17 +1,44 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Poppins, Quicksand } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "./providers";
 import { AppNavbar } from "./components/AppNavbar";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+// Tsukimi Rounded for app name/logo
+const tsukimiRounded = localFont({
+  src: [
+    {
+      path: "./fonts/Roboto_Flex,Tsukimi_Rounded/Tsukimi_Rounded/TsukimiRounded-Bold.ttf",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "./fonts/Roboto_Flex,Tsukimi_Rounded/Tsukimi_Rounded/TsukimiRounded-SemiBold.ttf",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "./fonts/Roboto_Flex,Tsukimi_Rounded/Tsukimi_Rounded/TsukimiRounded-Medium.ttf",
+      weight: "500",
+      style: "normal",
+    },
+  ],
+  variable: "--font-logo",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// Quicksand for headers
+const quicksand = Quicksand({
+  variable: "--font-heading",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+// Poppins for body text
+const poppins = Poppins({
+  variable: "--font-body",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -25,9 +52,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${tsukimiRounded.variable} ${quicksand.variable} ${poppins.variable} font-body antialiased`}
       >
         <Providers>
           <div className="min-h-screen flex flex-col">
