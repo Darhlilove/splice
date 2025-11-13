@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { useStoredSpec } from "@/hooks/use-stored-spec";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
+import { Suspense } from "react";
 
-export default function ExplorerPage() {
+function ExplorerContent() {
   const { spec, metadata, isLoading, hasSpec } = useStoredSpec();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -183,5 +184,27 @@ export default function ExplorerPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+export default function ExplorerPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center p-8 py-24">
+          <Card className="max-w-2xl w-full">
+            <CardContent className="text-center p-12">
+              <Icon
+                icon="lucide:loader-2"
+                className="w-12 h-12 mx-auto mb-4 animate-spin text-primary"
+              />
+              <p className="text-lg">Loading...</p>
+            </CardContent>
+          </Card>
+        </div>
+      }
+    >
+      <ExplorerContent />
+    </Suspense>
   );
 }
