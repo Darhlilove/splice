@@ -3,16 +3,24 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useStoredSpec } from "@/hooks/use-stored-spec";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
 import { Suspense } from "react";
 
 function ExplorerContent() {
-  const { spec, metadata, isLoading, hasSpec } = useStoredSpec();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const specId = searchParams.get("specId");
+  const { spec, metadata, isLoading, hasSpec, allSpecs, switchSpec } =
+    useStoredSpec(specId || undefined);
+  const router = useRouter();
 
   if (isLoading) {
     return (
@@ -55,24 +63,75 @@ function ExplorerContent() {
     );
   }
 
+  const handleSpecChange = (newSpecId: string) => {
+    switchSpec(newSpecId);
+    router.push(`/explorer?specId=${newSpecId}`);
+  };
+
   return (
     <div className="container mx-auto p-8 max-w-7xl">
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <div>
+          <div className="flex-1">
             <h1 className="text-4xl font-bold mb-2">{spec.info.title}</h1>
             <p className="text-muted-foreground">
               Version {spec.info.version}
               {metadata?.fileName && ` • ${metadata.fileName}`}
-              {specId && (
-                <span className="text-xs ml-2 font-mono">({specId})</span>
-              )}
             </p>
           </div>
-          <Button variant="outline" onClick={() => router.push("/upload")}>
-            <Icon icon="lucide:upload" className="w-4 h-4 mr-2" />
-            Upload New Spec
-          </Button>
+          <div className="flex items-center gap-3">
+            {allSpecs.length > 1 && (
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-xs rounded-full">
+                  {allSpecs.length} specs
+                </Badge>
+                <Select
+                  value={specId || allSpecs[allSpecs.length - 1]?.specId}
+                  onValueChange={handleSpecChange}
+                >
+                  <SelectTrigger className="w-[320px] h-11 rounded-full">
+                    <SelectValue placeholder="Select a spec">
+                      {(() => {
+                        const currentSpec = allSpecs.find(
+                          (s) =>
+                            s.specId ===
+                            (specId || allSpecs[allSpecs.length - 1]?.specId)
+                        );
+                        if (!currentSpec) return "Select a spec";
+                        return `${
+                          currentSpec.metadata.fileName ||
+                          currentSpec.spec.info.title
+                        } • v${currentSpec.spec.info.version}`;
+                      })()}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allSpecs.map((s) => (
+                      <SelectItem key={s.specId} value={s.specId}>
+                        <div className="flex flex-col items-start gap-0.5">
+                          <span className="font-medium">
+                            {s.spec.info.title}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {s.metadata.fileName || "Uploaded spec"} • v
+                            {s.spec.info.version}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => router.push("/upload")}
+              className="h-11 rounded-full px-6"
+            >
+              <Icon icon="lucide:upload" className="w-4 h-4 mr-2" />
+              Upload New Spec
+            </Button>
+          </div>
         </div>
         {spec.info.description && (
           <p className="text-base text-foreground/70 mt-4">

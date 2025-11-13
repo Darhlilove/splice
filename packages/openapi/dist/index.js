@@ -10,3 +10,5 @@ export { parseOpenAPISpec } from "./parser.js";
 export { ParserError } from "./types.js";
 // Export store functions
 export { generateSpecId, saveSpec, getSpec, deleteSpec, clearAllSpecs, getStoreSize, getAllSpecIds, } from "./store.js";
+// Export utility functions
+export { removeCircularReferences, safeStringify } from "./utils.js";

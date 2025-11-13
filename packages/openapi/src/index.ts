@@ -37,3 +37,6 @@ export {
   getStoreSize,
   getAllSpecIds,
 } from "./store.js";
+
+// Export utility functions
+export { removeCircularReferences, safeStringify } from "./utils.js";

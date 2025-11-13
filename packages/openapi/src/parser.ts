@@ -14,6 +14,7 @@ import type {
   OpenAPISpec,
 } from "./types.js";
 import { ParserError } from "./types.js";
+import { removeCircularReferences } from "./utils.js";
 
 /**
  * Parse an OpenAPI specification from a file path or URL
@@ -31,7 +32,14 @@ export async function parseOpenAPISpec(source: string): Promise<ParsedSpec> {
     const endpoints = extractEndpoints(api);
     const schemas = extractSchemas(api);
 
-    return { info, endpoints, schemas };
+    // Remove circular references to make the spec JSON-serializable
+    const cleanedSpec = removeCircularReferences({
+      info,
+      endpoints,
+      schemas,
+    });
+
+    return cleanedSpec;
   } catch (error) {
     throw handleParserError(error as Error, source);
   }

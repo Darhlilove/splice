@@ -3,6 +3,7 @@
  */
 import SwaggerParser from "@apidevtools/swagger-parser";
 import { ParserError } from "./types.js";
+import { removeCircularReferences } from "./utils.js";
 /**
  * Parse an OpenAPI specification from a file path or URL
  * @param source - File path or URL to the OpenAPI specification
@@ -17,7 +18,13 @@ export async function parseOpenAPISpec(source) {
         const info = extractInfo(api);
         const endpoints = extractEndpoints(api);
         const schemas = extractSchemas(api);
-        return { info, endpoints, schemas };
+        // Remove circular references to make the spec JSON-serializable
+        const cleanedSpec = removeCircularReferences({
+            info,
+            endpoints,
+            schemas,
+        });
+        return cleanedSpec;
     }
     catch (error) {
         throw handleParserError(error, source);

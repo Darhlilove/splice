@@ -8,4 +8,5 @@ export { parseOpenAPISpec } from "./parser.js";
 export type { ParsedSpec, APIInfo, Server, Contact, License, Endpoint, HTTPMethod, Parameter, RequestBody, Response, MediaType, SchemaObject, } from "./types.js";
 export { ParserError } from "./types.js";
 export { generateSpecId, saveSpec, getSpec, deleteSpec, clearAllSpecs, getStoreSize, getAllSpecIds, } from "./store.js";
+export { removeCircularReferences, safeStringify } from "./utils.js";
 //# sourceMappingURL=index.d.ts.map

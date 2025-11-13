@@ -3,9 +3,11 @@
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Badge } from "@/components/ui/badge";
 import { Icon } from "@iconify/react";
 import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { storeSpec, getAllStoredSpecs } from "@/lib/spec-storage";
 
 type UploadMode = "file" | "url";
 
@@ -15,11 +17,16 @@ interface UploadFormProps {
 
 export function UploadForm({ onSubmit }: UploadFormProps) {
   const [mode, setMode] = useState<UploadMode>("file");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileError, setFileError] = useState<string>("");
   const [urlValue, setUrlValue] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [storedSpecsCount] = useState(() => {
+    // Initialize with stored specs count (client-side only)
+    if (typeof window === "undefined") return 0;
+    return getAllStoredSpecs().length;
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -42,22 +49,26 @@ export function UploadForm({ onSubmit }: UploadFormProps) {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files || []);
     setFileError("");
 
-    if (!file) {
-      setSelectedFile(null);
+    if (files.length === 0) {
+      setSelectedFiles([]);
       return;
     }
 
-    const error = validateFile(file);
-    if (error) {
-      setFileError(error);
-      setSelectedFile(null);
-      return;
+    // Validate all files
+    const validFiles: File[] = [];
+    for (const file of files) {
+      const error = validateFile(file);
+      if (error) {
+        setFileError(`${file.name}: ${error}`);
+        return;
+      }
+      validFiles.push(file);
     }
 
-    setSelectedFile(file);
+    setSelectedFiles(validFiles);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -75,22 +86,26 @@ export function UploadForm({ onSubmit }: UploadFormProps) {
     setIsDragging(false);
     setFileError("");
 
-    const file = e.dataTransfer.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length === 0) return;
 
-    const error = validateFile(file);
-    if (error) {
-      setFileError(error);
-      setSelectedFile(null);
-      return;
+    // Validate all files
+    const validFiles: File[] = [];
+    for (const file of files) {
+      const error = validateFile(file);
+      if (error) {
+        setFileError(`${file.name}: ${error}`);
+        return;
+      }
+      validFiles.push(file);
     }
 
-    setSelectedFile(file);
+    setSelectedFiles(validFiles);
   };
 
   const handleSubmit = async () => {
-    if (mode === "file" && !selectedFile) {
-      setFileError("Please select a file");
+    if (mode === "file" && selectedFiles.length === 0) {
+      setFileError("Please select at least one file");
       return;
     }
 
@@ -102,34 +117,44 @@ export function UploadForm({ onSubmit }: UploadFormProps) {
     setFileError("");
 
     try {
-      if (mode === "file" && selectedFile) {
-        // Upload file
-        const formData = new FormData();
-        formData.append("file", selectedFile);
+      if (mode === "file" && selectedFiles.length > 0) {
+        // Upload all files
+        const uploadPromises = selectedFiles.map(async (file) => {
+          const formData = new FormData();
+          formData.append("file", file);
 
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
+          const response = await fetch("/api/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          return response.json();
         });
 
-        const result = await response.json();
+        const results = await Promise.all(uploadPromises);
 
-        if (!result.success) {
-          setFileError(result.error || "Failed to parse specification");
+        // Check if any failed
+        const failed = results.find((r) => !r.success);
+        if (failed) {
+          setFileError(
+            failed.error || "Failed to parse one or more specifications"
+          );
           setIsUploading(false);
           return;
         }
 
-        // Store parsed spec and specId in sessionStorage
-        sessionStorage.setItem("parsedSpec", JSON.stringify(result.data));
-        sessionStorage.setItem("specMetadata", JSON.stringify(result.metadata));
-        if (result.specId) {
-          sessionStorage.setItem("specId", result.specId);
+        // Store all parsed specs
+        let lastSpecId = null;
+        for (const result of results) {
+          if (result.specId && result.data) {
+            storeSpec(result.specId, result.data, result.metadata);
+            lastSpecId = result.specId;
+          }
         }
 
-        // Navigate to explorer with specId in URL
+        // Navigate to explorer with the last uploaded spec
         router.push(
-          result.specId ? `/explorer?specId=${result.specId}` : "/explorer"
+          lastSpecId ? `/explorer?specId=${lastSpecId}` : "/explorer"
         );
       } else if (mode === "url" && urlValue) {
         // Parse from URL
@@ -149,11 +174,9 @@ export function UploadForm({ onSubmit }: UploadFormProps) {
           return;
         }
 
-        // Store parsed spec and specId in sessionStorage
-        sessionStorage.setItem("parsedSpec", JSON.stringify(result.data));
-        sessionStorage.setItem("specMetadata", JSON.stringify(result.metadata));
-        if (result.specId) {
-          sessionStorage.setItem("specId", result.specId);
+        // Store parsed spec using the storage utility
+        if (result.specId && result.data) {
+          storeSpec(result.specId, result.data, result.metadata);
         }
 
         // Navigate to explorer with specId in URL
@@ -165,7 +188,7 @@ export function UploadForm({ onSubmit }: UploadFormProps) {
       // Call the optional onSubmit callback
       onSubmit?.({
         mode,
-        file: mode === "file" ? selectedFile || undefined : undefined,
+        file: mode === "file" ? selectedFiles[0] || undefined : undefined,
         url: mode === "url" ? urlValue : undefined,
       });
     } catch (error) {
@@ -188,12 +211,27 @@ export function UploadForm({ onSubmit }: UploadFormProps) {
   return (
     <div className="w-full max-w-3xl mx-auto p-8">
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-3">
-          Upload OpenAPI Specification
-        </h1>
+        <div className="flex items-center justify-center gap-3 mb-3">
+          <h1 className="text-4xl font-bold">Upload OpenAPI Specification</h1>
+          {storedSpecsCount > 0 && (
+            <Badge variant="secondary" className="text-sm rounded-full">
+              {storedSpecsCount} stored
+            </Badge>
+          )}
+        </div>
         <p className="text-muted-foreground text-lg">
           Select your OpenAPI spec file to parse and explore.
         </p>
+        {storedSpecsCount > 0 && (
+          <Button
+            variant="link"
+            onClick={() => router.push("/explorer")}
+            className="mt-2"
+          >
+            <Icon icon="lucide:eye" className="w-4 h-4 mr-2" />
+            View stored specs
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col gap-6">
@@ -276,6 +314,7 @@ export function UploadForm({ onSubmit }: UploadFormProps) {
               <input
                 ref={fileInputRef}
                 type="file"
+                multiple
                 accept=".json,.yaml,.yml,application/json,application/x-yaml,text/yaml"
                 onChange={handleFileChange}
                 className="hidden"
@@ -300,39 +339,70 @@ export function UploadForm({ onSubmit }: UploadFormProps) {
               </div>
             )}
 
-            {/* Selected File Display */}
-            {selectedFile && !fileError && (
+            {/* Selected Files Display */}
+            {selectedFiles.length > 0 && !fileError && (
               <div className="border border-border rounded-xl p-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <Icon
-                      icon={
-                        selectedFile.name.endsWith(".json")
-                          ? "lucide:file-code"
-                          : "lucide:file-text"
-                      }
-                      className="w-6 h-6 text-primary"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{selectedFile.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatFileSize(selectedFile.size)}
-                    </p>
-                  </div>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-medium">
+                    {selectedFiles.length} file
+                    {selectedFiles.length > 1 ? "s" : ""} selected
+                  </p>
                   <Button
                     variant="ghost"
-                    size="icon"
+                    size="sm"
                     onClick={() => {
-                      setSelectedFile(null);
+                      setSelectedFiles([]);
                       setFileError("");
                       if (fileInputRef.current) {
                         fileInputRef.current.value = "";
                       }
                     }}
                   >
-                    <Icon icon="lucide:x" className="w-5 h-5" />
+                    Clear all
                   </Button>
+                </div>
+                <div className="space-y-2">
+                  {selectedFiles.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-3 p-2 rounded-lg bg-muted/50"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Icon
+                          icon={
+                            file.name.endsWith(".json")
+                              ? "lucide:file-code"
+                              : "lucide:file-text"
+                          }
+                          className="w-5 h-5 text-primary"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate text-sm">
+                          {file.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(file.size)}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFiles(
+                            selectedFiles.filter((_, i) => i !== index)
+                          );
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = "";
+                          }
+                        }}
+                      >
+                        <Icon icon="lucide:x" className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -365,8 +435,9 @@ export function UploadForm({ onSubmit }: UploadFormProps) {
         <div className="flex justify-between pt-4">
           <Button
             variant="outline"
+            className="h-11 rounded-full px-6"
             onClick={() => {
-              setSelectedFile(null);
+              setSelectedFiles([]);
               setFileError("");
               setUrlValue("");
             }}
@@ -374,10 +445,12 @@ export function UploadForm({ onSubmit }: UploadFormProps) {
             Cancel
           </Button>
           <Button
+            variant="outline"
+            className="h-11 rounded-full px-6"
             onClick={handleSubmit}
             disabled={
               isUploading ||
-              (mode === "file" && !selectedFile) ||
+              (mode === "file" && selectedFiles.length === 0) ||
               (mode === "url" && !urlValue)
             }
           >
@@ -387,12 +460,19 @@ export function UploadForm({ onSubmit }: UploadFormProps) {
                   icon="lucide:loader-2"
                   className="w-4 h-4 mr-2 animate-spin"
                 />
-                Parsing...
+                Parsing{" "}
+                {selectedFiles.length > 1
+                  ? `${selectedFiles.length} files`
+                  : ""}
+                ...
               </>
             ) : (
               <>
                 <Icon icon="lucide:upload" className="w-4 h-4 mr-2" />
-                Parse Specification
+                Parse{" "}
+                {selectedFiles.length > 1
+                  ? `${selectedFiles.length} Specifications`
+                  : "Specification"}
               </>
             )}
           </Button>
