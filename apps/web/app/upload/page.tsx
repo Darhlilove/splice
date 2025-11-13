@@ -1,6 +1,6 @@
 "use client";
 
-import { UploadForm } from "../components/UploadForm";
+import { UploadForm } from "@/components/UploadForm";
 
 export default function UploadPage() {
   const handleSubmit = (data: {

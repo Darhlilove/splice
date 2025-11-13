@@ -3,7 +3,6 @@
  */
 import SwaggerParser from "@apidevtools/swagger-parser";
 import { ParserError } from "./types.js";
-import { removeCircularReferences } from "./utils.js";
 /**
  * Parse an OpenAPI specification from a file path or URL
  * @param source - File path or URL to the OpenAPI specification
@@ -12,19 +11,24 @@ import { removeCircularReferences } from "./utils.js";
  */
 export async function parseOpenAPISpec(source) {
     try {
-        // Parse and dereference the spec using SwaggerParser
-        const api = (await SwaggerParser.validate(source));
-        // Extract info, endpoints, and schemas
-        const info = extractInfo(api);
-        const endpoints = extractEndpoints(api);
-        const schemas = extractSchemas(api);
-        // Remove circular references to make the spec JSON-serializable
-        const cleanedSpec = removeCircularReferences({
+        // Use bundle() to preserve internal $refs (especially in schemas)
+        // This keeps references like {"$ref": "#/components/schemas/Pet"} intact
+        const bundledApi = (await SwaggerParser.bundle(source));
+        // Also dereference to get a fully resolved version for extracting requestBodies
+        const dereferencedApi = (await SwaggerParser.dereference(source));
+        // Extract info from bundled (doesn't matter which)
+        const info = extractInfo(bundledApi);
+        // Extract schemas from bundled to preserve $refs within schemas
+        const schemas = extractSchemas(bundledApi);
+        // Extract endpoints using both versions:
+        // - Use dereferenced for requestBody/response content extraction
+        // - But preserve $refs in the actual schema objects
+        const endpoints = extractEndpointsHybrid(bundledApi, dereferencedApi);
+        return {
             info,
             endpoints,
             schemas,
-        });
-        return cleanedSpec;
+        };
     }
     catch (error) {
         throw handleParserError(error, source);
@@ -75,7 +79,133 @@ function extractInfo(api) {
     return info;
 }
 /**
- * Extract all endpoints from the specification
+ * Extract all endpoints using a hybrid approach
+ * Uses bundled API for schema $refs and dereferenced API for requestBody/response content
+ */
+function extractEndpointsHybrid(bundledApi, dereferencedApi) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+    const endpoints = [];
+    if (!bundledApi.paths) {
+        return endpoints;
+    }
+    // Iterate through all paths
+    for (const [path, pathItem] of Object.entries(bundledApi.paths)) {
+        if (!pathItem || typeof pathItem !== "object")
+            continue;
+        // Get the dereferenced version of this path
+        const dereferencedPathItem = (_a = dereferencedApi.paths) === null || _a === void 0 ? void 0 : _a[path];
+        // Iterate through HTTP methods
+        const methods = [
+            "get",
+            "post",
+            "put",
+            "patch",
+            "delete",
+            "options",
+            "head",
+            "trace",
+        ];
+        for (const method of methods) {
+            const operation = pathItem[method];
+            const dereferencedOperation = dereferencedPathItem === null || dereferencedPathItem === void 0 ? void 0 : dereferencedPathItem[method];
+            if (!operation)
+                continue;
+            const endpoint = {
+                path,
+                method,
+                responses: {},
+            };
+            // Extract operationId, summary, description
+            if (operation.operationId)
+                endpoint.operationId = operation.operationId;
+            if (operation.summary)
+                endpoint.summary = operation.summary;
+            if (operation.description)
+                endpoint.description = operation.description;
+            // Extract tags
+            if (operation.tags && Array.isArray(operation.tags)) {
+                endpoint.tags = operation.tags;
+            }
+            // Extract parameters (use bundled - parameters usually don't have complex refs)
+            if (operation.parameters && Array.isArray(operation.parameters)) {
+                endpoint.parameters = operation.parameters.map((param) => {
+                    const parameter = {
+                        name: param.name || "",
+                        in: param.in || "query",
+                        required: param.required || false,
+                        schema: (param.schema || param),
+                    };
+                    if (param.description) {
+                        parameter.description = param.description;
+                    }
+                    return parameter;
+                });
+            }
+            // Extract requestBody - use dereferenced to resolve requestBodies refs
+            // but use bundled schemas to preserve schema $refs
+            if (dereferencedOperation === null || dereferencedOperation === void 0 ? void 0 : dereferencedOperation.requestBody) {
+                const rb = dereferencedOperation.requestBody;
+                endpoint.requestBody = {
+                    required: rb.required || false,
+                    content: {},
+                };
+                if (rb.description) {
+                    endpoint.requestBody.description = rb.description;
+                }
+                if (rb.content && typeof rb.content === "object") {
+                    for (const [contentType, mediaTypeObj] of Object.entries(rb.content)) {
+                        if (mediaTypeObj &&
+                            typeof mediaTypeObj === "object" &&
+                            "schema" in mediaTypeObj) {
+                            // Use the bundled version's schema if available to preserve $refs
+                            const bundledSchema = (_d = (_c = (_b = operation.requestBody) === null || _b === void 0 ? void 0 : _b.content) === null || _c === void 0 ? void 0 : _c[contentType]) === null || _d === void 0 ? void 0 : _d.schema;
+                            endpoint.requestBody.content[contentType] = {
+                                schema: (bundledSchema ||
+                                    mediaTypeObj.schema ||
+                                    {}),
+                            };
+                        }
+                    }
+                }
+            }
+            // Extract responses - use dereferenced for content but bundled for schemas
+            if (dereferencedOperation === null || dereferencedOperation === void 0 ? void 0 : dereferencedOperation.responses) {
+                for (const [statusCode, responseObj] of Object.entries(dereferencedOperation.responses)) {
+                    const response = {
+                        description: responseObj.description || "",
+                    };
+                    // Handle content for OpenAPI 3.x
+                    if (responseObj.content) {
+                        response.content = {};
+                        for (const [contentType, mediaTypeObj] of Object.entries(responseObj.content)) {
+                            // Try to get the bundled version's schema to preserve $refs
+                            const bundledSchema = (_h = (_g = (_f = (_e = operation.responses) === null || _e === void 0 ? void 0 : _e[statusCode]) === null || _f === void 0 ? void 0 : _f.content) === null || _g === void 0 ? void 0 : _g[contentType]) === null || _h === void 0 ? void 0 : _h.schema;
+                            response.content[contentType] = {
+                                schema: (bundledSchema ||
+                                    mediaTypeObj.schema ||
+                                    {}),
+                            };
+                        }
+                    }
+                    // Handle schema for Swagger 2.0
+                    else if (responseObj.schema) {
+                        const bundledSchema = (_k = (_j = operation.responses) === null || _j === void 0 ? void 0 : _j[statusCode]) === null || _k === void 0 ? void 0 : _k.schema;
+                        response.content = {
+                            "application/json": {
+                                schema: (bundledSchema || responseObj.schema),
+                            },
+                        };
+                    }
+                    endpoint.responses[statusCode] = response;
+                }
+            }
+            endpoints.push(endpoint);
+        }
+    }
+    return endpoints;
+}
+/**
+ * Extract all endpoints from the specification (legacy - kept for reference)
  */
 function extractEndpoints(api) {
     const endpoints = [];
@@ -135,6 +265,11 @@ function extractEndpoints(api) {
             // Extract requestBody (OpenAPI 3.x)
             if (operation.requestBody) {
                 const rb = operation.requestBody;
+                // Skip if requestBody is just a $ref (shouldn't happen with dereference, but just in case)
+                if (rb.$ref) {
+                    console.warn(`Unresolved requestBody $ref: ${rb.$ref} at ${method.toUpperCase()} ${path}`);
+                    continue;
+                }
                 endpoint.requestBody = {
                     required: rb.required || false,
                     content: {},
@@ -142,11 +277,15 @@ function extractEndpoints(api) {
                 if (rb.description) {
                     endpoint.requestBody.description = rb.description;
                 }
-                if (rb.content) {
+                if (rb.content && typeof rb.content === "object") {
                     for (const [contentType, mediaTypeObj] of Object.entries(rb.content)) {
-                        endpoint.requestBody.content[contentType] = {
-                            schema: (mediaTypeObj.schema || {}),
-                        };
+                        if (mediaTypeObj &&
+                            typeof mediaTypeObj === "object" &&
+                            "schema" in mediaTypeObj) {
+                            endpoint.requestBody.content[contentType] = {
+                                schema: (mediaTypeObj.schema || {}),
+                            };
+                        }
                     }
                 }
             }

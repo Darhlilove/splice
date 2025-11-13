@@ -24,22 +24,31 @@ import { removeCircularReferences } from "./utils.js";
  */
 export async function parseOpenAPISpec(source: string): Promise<ParsedSpec> {
   try {
-    // Parse and dereference the spec using SwaggerParser
-    const api = (await SwaggerParser.validate(source)) as OpenAPISpec;
+    // Use bundle() to preserve internal $refs (especially in schemas)
+    // This keeps references like {"$ref": "#/components/schemas/Pet"} intact
+    const bundledApi = (await SwaggerParser.bundle(source)) as OpenAPISpec;
 
-    // Extract info, endpoints, and schemas
-    const info = extractInfo(api);
-    const endpoints = extractEndpoints(api);
-    const schemas = extractSchemas(api);
+    // Also dereference to get a fully resolved version for extracting requestBodies
+    const dereferencedApi = (await SwaggerParser.dereference(
+      source
+    )) as OpenAPISpec;
 
-    // Remove circular references to make the spec JSON-serializable
-    const cleanedSpec = removeCircularReferences({
+    // Extract info from bundled (doesn't matter which)
+    const info = extractInfo(bundledApi);
+
+    // Extract schemas from bundled to preserve $refs within schemas
+    const schemas = extractSchemas(bundledApi);
+
+    // Extract endpoints using both versions:
+    // - Use dereferenced for requestBody/response content extraction
+    // - But preserve $refs in the actual schema objects
+    const endpoints = extractEndpointsHybrid(bundledApi, dereferencedApi);
+
+    return {
       info,
       endpoints,
       schemas,
-    });
-
-    return cleanedSpec;
+    };
   } catch (error) {
     throw handleParserError(error as Error, source);
   }
@@ -99,7 +108,163 @@ function extractInfo(api: OpenAPISpec): APIInfo {
 }
 
 /**
- * Extract all endpoints from the specification
+ * Extract all endpoints using a hybrid approach
+ * Uses bundled API for schema $refs and dereferenced API for requestBody/response content
+ */
+function extractEndpointsHybrid(
+  bundledApi: OpenAPISpec,
+  dereferencedApi: OpenAPISpec
+): Endpoint[] {
+  const endpoints: Endpoint[] = [];
+
+  if (!bundledApi.paths) {
+    return endpoints;
+  }
+
+  // Iterate through all paths
+  for (const [path, pathItem] of Object.entries(bundledApi.paths)) {
+    if (!pathItem || typeof pathItem !== "object") continue;
+
+    // Get the dereferenced version of this path
+    const dereferencedPathItem = dereferencedApi.paths?.[path];
+
+    // Iterate through HTTP methods
+    const methods: HTTPMethod[] = [
+      "get",
+      "post",
+      "put",
+      "patch",
+      "delete",
+      "options",
+      "head",
+      "trace",
+    ];
+
+    for (const method of methods) {
+      const operation = pathItem[method];
+      const dereferencedOperation = dereferencedPathItem?.[method];
+
+      if (!operation) continue;
+
+      const endpoint: Endpoint = {
+        path,
+        method,
+        responses: {},
+      };
+
+      // Extract operationId, summary, description
+      if (operation.operationId) endpoint.operationId = operation.operationId;
+      if (operation.summary) endpoint.summary = operation.summary;
+      if (operation.description) endpoint.description = operation.description;
+
+      // Extract tags
+      if (operation.tags && Array.isArray(operation.tags)) {
+        endpoint.tags = operation.tags;
+      }
+
+      // Extract parameters (use bundled - parameters usually don't have complex refs)
+      if (operation.parameters && Array.isArray(operation.parameters)) {
+        endpoint.parameters = operation.parameters.map((param) => {
+          const parameter: Parameter = {
+            name: param.name || "",
+            in: (param.in as Parameter["in"]) || "query",
+            required: param.required || false,
+            schema: (param.schema || param) as SchemaObject,
+          };
+
+          if (param.description) {
+            parameter.description = param.description;
+          }
+
+          return parameter;
+        });
+      }
+
+      // Extract requestBody - use dereferenced to resolve requestBodies refs
+      // but use bundled schemas to preserve schema $refs
+      if (dereferencedOperation?.requestBody) {
+        const rb = dereferencedOperation.requestBody as any;
+
+        endpoint.requestBody = {
+          required: rb.required || false,
+          content: {},
+        };
+
+        if (rb.description) {
+          endpoint.requestBody.description = rb.description;
+        }
+
+        if (rb.content && typeof rb.content === "object") {
+          for (const [contentType, mediaTypeObj] of Object.entries(
+            rb.content
+          )) {
+            if (
+              mediaTypeObj &&
+              typeof mediaTypeObj === "object" &&
+              "schema" in mediaTypeObj
+            ) {
+              // Use the bundled version's schema if available to preserve $refs
+              const bundledSchema =
+                operation.requestBody?.content?.[contentType]?.schema;
+              endpoint.requestBody.content[contentType] = {
+                schema: (bundledSchema ||
+                  mediaTypeObj.schema ||
+                  {}) as SchemaObject,
+              };
+            }
+          }
+        }
+      }
+
+      // Extract responses - use dereferenced for content but bundled for schemas
+      if (dereferencedOperation?.responses) {
+        for (const [statusCode, responseObj] of Object.entries(
+          dereferencedOperation.responses
+        )) {
+          const response: Response = {
+            description: responseObj.description || "",
+          };
+
+          // Handle content for OpenAPI 3.x
+          if (responseObj.content) {
+            response.content = {};
+            for (const [contentType, mediaTypeObj] of Object.entries(
+              responseObj.content
+            )) {
+              // Try to get the bundled version's schema to preserve $refs
+              const bundledSchema =
+                operation.responses?.[statusCode]?.content?.[contentType]
+                  ?.schema;
+              response.content[contentType] = {
+                schema: (bundledSchema ||
+                  mediaTypeObj.schema ||
+                  {}) as SchemaObject,
+              };
+            }
+          }
+          // Handle schema for Swagger 2.0
+          else if (responseObj.schema) {
+            const bundledSchema = operation.responses?.[statusCode]?.schema;
+            response.content = {
+              "application/json": {
+                schema: (bundledSchema || responseObj.schema) as SchemaObject,
+              },
+            };
+          }
+
+          endpoint.responses[statusCode] = response;
+        }
+      }
+
+      endpoints.push(endpoint);
+    }
+  }
+
+  return endpoints;
+}
+
+/**
+ * Extract all endpoints from the specification (legacy - kept for reference)
  */
 function extractEndpoints(api: OpenAPISpec): Endpoint[] {
   const endpoints: Endpoint[] = [];
@@ -164,7 +329,18 @@ function extractEndpoints(api: OpenAPISpec): Endpoint[] {
 
       // Extract requestBody (OpenAPI 3.x)
       if (operation.requestBody) {
-        const rb = operation.requestBody;
+        const rb = operation.requestBody as any;
+
+        // Skip if requestBody is just a $ref (shouldn't happen with dereference, but just in case)
+        if (rb.$ref) {
+          console.warn(
+            `Unresolved requestBody $ref: ${
+              rb.$ref
+            } at ${method.toUpperCase()} ${path}`
+          );
+          continue;
+        }
+
         endpoint.requestBody = {
           required: rb.required || false,
           content: {},
@@ -174,13 +350,19 @@ function extractEndpoints(api: OpenAPISpec): Endpoint[] {
           endpoint.requestBody.description = rb.description;
         }
 
-        if (rb.content) {
+        if (rb.content && typeof rb.content === "object") {
           for (const [contentType, mediaTypeObj] of Object.entries(
             rb.content
           )) {
-            endpoint.requestBody.content[contentType] = {
-              schema: (mediaTypeObj.schema || {}) as SchemaObject,
-            };
+            if (
+              mediaTypeObj &&
+              typeof mediaTypeObj === "object" &&
+              "schema" in mediaTypeObj
+            ) {
+              endpoint.requestBody.content[contentType] = {
+                schema: (mediaTypeObj.schema || {}) as SchemaObject,
+              };
+            }
           }
         }
       }

@@ -3,7 +3,7 @@ import { Poppins, Quicksand } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "./providers";
-import { AppNavbar } from "./components/AppNavbar";
+import { ConditionalNavbar } from "@/components/ConditionalNavbar";
 
 // Tsukimi Rounded for app name/logo
 const tsukimiRounded = localFont({
@@ -58,7 +58,7 @@ export default function RootLayout({
       >
         <Providers>
           <div className="min-h-screen flex flex-col">
-            <AppNavbar />
+            <ConditionalNavbar />
             <main className="flex-1">{children}</main>
           </div>
         </Providers>
