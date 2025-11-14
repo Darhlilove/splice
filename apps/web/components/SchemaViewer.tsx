@@ -242,6 +242,46 @@ export function SchemaViewer({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [viewMode, setViewMode] = useState<"structured" | "json">("structured");
 
+  // Resolve schema for JSON view - recursively resolve all $refs
+  const resolvedSchemaForJson = useMemo(() => {
+    if (!schema || !allSchemas) return schema;
+
+    const resolveRefs = (obj: any, depth = 0): any => {
+      // Prevent infinite recursion
+      if (depth > 10) return obj;
+
+      if (!obj || typeof obj !== "object") return obj;
+
+      // If this is a $ref, resolve it
+      if (obj.$ref && typeof obj.$ref === "string") {
+        const refMatch = obj.$ref.match(/#\/components\/schemas\/(.+)/);
+        if (refMatch && refMatch[1]) {
+          const schemaName = refMatch[1];
+          const referencedSchema = allSchemas[schemaName];
+          if (referencedSchema) {
+            // Recursively resolve refs in the referenced schema
+            return resolveRefs(referencedSchema, depth + 1);
+          }
+        }
+        return obj;
+      }
+
+      // Handle arrays
+      if (Array.isArray(obj)) {
+        return obj.map((item) => resolveRefs(item, depth + 1));
+      }
+
+      // Handle objects - recursively resolve all properties
+      const resolved: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        resolved[key] = resolveRefs(value, depth + 1);
+      }
+      return resolved;
+    };
+
+    return resolveRefs(schema);
+  }, [schema, allSchemas]);
+
   const properties = useMemo(() => {
     if (!schema || typeof schema !== "object") {
       return [];
@@ -452,7 +492,7 @@ export function SchemaViewer({
           >
             {viewMode === "json" ? (
               <pre className="text-xs font-mono p-3 whitespace-pre-wrap break-words">
-                {JSON.stringify(schema, null, 2)}
+                {JSON.stringify(resolvedSchemaForJson, null, 2)}
               </pre>
             ) : properties.length > 0 ? (
               <div className="space-y-1 p-3">
