@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "./providers";
 import { ConditionalNavbar } from "@/components/ConditionalNavbar";
+import { Toaster } from "@/components/ui/sonner";
 
 // Tsukimi Rounded for app name/logo
 const tsukimiRounded = localFont({
@@ -61,6 +62,7 @@ export default function RootLayout({
             <ConditionalNavbar />
             <main className="flex-1">{children}</main>
           </div>
+          <Toaster />
         </Providers>
       </body>
     </html>

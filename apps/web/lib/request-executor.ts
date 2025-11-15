@@ -1,0 +1,261 @@
+/**
+ * Request executor utility
+ * Handles validation and execution of HTTP requests through the proxy
+ */
+
+import type { Endpoint, Parameter } from "@/packages/openapi/src/types";
+import type {
+  RequestConfig,
+  ResponseData,
+  ValidationError,
+  ParameterValue,
+  AuthConfig,
+} from "@/types/request-builder";
+import { buildFinalRequest } from "./request-builder";
+import { validateParameter } from "./parameter-validation";
+import { validateRequestBody } from "./body-validation";
+
+/**
+ * Result of request execution
+ */
+export interface ExecuteRequestResult {
+  success: boolean;
+  response?: ResponseData;
+  error?: string;
+  validationErrors?: ValidationError[];
+}
+
+/**
+ * Validates all inputs before request execution
+ */
+export function validateInputs(
+  endpoint: Endpoint,
+  parameters: Record<string, ParameterValue>,
+  requestBody: string | Record<string, unknown> | undefined,
+  contentType: string
+): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  // Validate parameters
+  if (endpoint.parameters) {
+    endpoint.parameters.forEach((param) => {
+      const value = parameters[param.name];
+      const result = validateParameter(param, value);
+
+      if (!result.isValid && result.error) {
+        errors.push({
+          field: param.name,
+          message: result.error,
+          type: result.type || "required",
+        });
+      }
+    });
+  }
+
+  // Validate request body
+  if (endpoint.requestBody) {
+    const bodySchema = endpoint.requestBody.content[contentType]?.schema;
+
+    if (endpoint.requestBody.required && !requestBody) {
+      errors.push({
+        field: "body",
+        message: "Request body is required",
+        type: "required",
+      });
+    } else if (requestBody && bodySchema) {
+      const bodyValidation = validateRequestBody(
+        requestBody,
+        bodySchema,
+        contentType
+      );
+
+      if (!bodyValidation.isValid) {
+        bodyValidation.errors.forEach((error) => {
+          errors.push({
+            field: "body",
+            message: error,
+            type: "json",
+          });
+        });
+      }
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Executes an HTTP request through the proxy endpoint
+ */
+export async function executeRequest(
+  endpoint: Endpoint,
+  baseUrl: string,
+  parameters: Record<string, ParameterValue>,
+  requestBody: string | Record<string, unknown> | undefined,
+  contentType: string,
+  authentication: AuthConfig
+): Promise<ExecuteRequestResult> {
+  // Validate all inputs first
+  const validationErrors = validateInputs(
+    endpoint,
+    parameters,
+    requestBody,
+    contentType
+  );
+
+  if (validationErrors.length > 0) {
+    return {
+      success: false,
+      validationErrors,
+      error: "Validation failed. Please fix the errors and try again.",
+    };
+  }
+
+  try {
+    // Build the final request configuration
+    const requestConfig = buildFinalRequest(
+      endpoint,
+      baseUrl,
+      parameters,
+      requestBody,
+      contentType,
+      authentication
+    );
+
+    // Record start time for duration measurement
+    const startTime = Date.now();
+
+    // Call the proxy endpoint
+    const proxyResponse = await fetch("/api/proxy", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        url: requestConfig.url,
+        method: requestConfig.method,
+        headers: requestConfig.headers,
+        body: requestConfig.body,
+      }),
+    });
+
+    // Calculate duration
+    const duration = Date.now() - startTime;
+
+    // Parse proxy response
+    const proxyData = await proxyResponse.json();
+
+    // Check if proxy request failed
+    if (!proxyResponse.ok) {
+      return {
+        success: false,
+        error: proxyData.error || "Request failed",
+      };
+    }
+
+    // Extract response data from proxy response
+    const responseData: ResponseData = {
+      status: proxyData.status,
+      statusText: proxyData.statusText,
+      headers: proxyData.headers,
+      body: proxyData.body,
+      duration: proxyData.duration || duration,
+      timestamp: proxyData.timestamp
+        ? new Date(proxyData.timestamp)
+        : new Date(),
+    };
+
+    return {
+      success: true,
+      response: responseData,
+    };
+  } catch (error) {
+    // Handle network errors
+    if (error instanceof TypeError) {
+      return {
+        success: false,
+        error: "Network error: Failed to connect to the proxy server",
+      };
+    }
+
+    // Handle timeout errors
+    if (error instanceof Error && error.name === "AbortError") {
+      return {
+        success: false,
+        error: "Request timeout: The request took too long to complete",
+      };
+    }
+
+    // Handle other errors
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "An unexpected error occurred",
+    };
+  }
+}
+
+/**
+ * Executes a request with loading state management
+ * This is a convenience wrapper that can be used in React components
+ */
+export async function executeRequestWithState(
+  endpoint: Endpoint,
+  baseUrl: string,
+  parameters: Record<string, ParameterValue>,
+  requestBody: string | Record<string, unknown> | undefined,
+  contentType: string,
+  authentication: AuthConfig,
+  setIsExecuting: (isExecuting: boolean) => void,
+  setResponse: (response: ResponseData | null) => void,
+  setValidationErrors: (errors: ValidationError[]) => void,
+  onError?: (error: string) => void,
+  onSuccess?: () => void
+): Promise<void> {
+  // Set loading state
+  setIsExecuting(true);
+  setResponse(null);
+  setValidationErrors([]);
+
+  try {
+    // Execute the request
+    const result = await executeRequest(
+      endpoint,
+      baseUrl,
+      parameters,
+      requestBody,
+      contentType,
+      authentication
+    );
+
+    if (result.success && result.response) {
+      // Update response state
+      setResponse(result.response);
+
+      // Call success callback if provided
+      if (onSuccess) {
+        onSuccess();
+      }
+    } else {
+      // Handle validation errors
+      if (result.validationErrors) {
+        setValidationErrors(result.validationErrors);
+      }
+
+      // Call error callback if provided
+      if (result.error && onError) {
+        onError(result.error);
+      }
+    }
+  } catch (error) {
+    // Handle unexpected errors
+    const errorMessage =
+      error instanceof Error ? error.message : "An unexpected error occurred";
+    if (onError) {
+      onError(errorMessage);
+    }
+  } finally {
+    // Clear loading state
+    setIsExecuting(false);
+  }
+}

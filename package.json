@@ -6,7 +6,10 @@
     "dev": "pnpm --filter @splice/web dev",
     "build": "pnpm --filter @splice/web build",
     "start": "pnpm --filter @splice/web start",
-    "lint": "pnpm --filter @splice/web lint"
+    "lint": "pnpm --filter @splice/web lint",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
@@ -24,13 +27,20 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-json-tree": "^0.13.0",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "@vitest/ui": "^4.0.9",
     "eslint": "^9",
     "eslint-config-next": "16.0.1",
+    "happy-dom": "^20.0.10",
+    "jsdom": "^27.2.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.0.9"
   }
 }

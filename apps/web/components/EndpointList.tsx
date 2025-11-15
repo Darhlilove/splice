@@ -2,6 +2,13 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Icon } from "@iconify/react";
 import type { Endpoint, HTTPMethod } from "@splice/openapi";
 import { useState, useMemo } from "react";
@@ -114,26 +121,35 @@ export function EndpointList({
           />
         </div>
 
-        {/* Tag filters */}
+        {/* Tag filter dropdown */}
         {tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-3">
-            <Badge
-              variant={selectedTag === null ? "default" : "outline"}
-              className="cursor-pointer text-xs"
-              onClick={() => setSelectedTag(null)}
+          <div className="mb-3">
+            <Select
+              value={selectedTag || "all"}
+              onValueChange={(value) =>
+                setSelectedTag(value === "all" ? null : value)
+              }
             >
-              All
-            </Badge>
-            {tags.map((tag) => (
-              <Badge
-                key={tag}
-                variant={selectedTag === tag ? "default" : "outline"}
-                className="cursor-pointer text-xs"
-                onClick={() => setSelectedTag(tag)}
-              >
-                {tag}
-              </Badge>
-            ))}
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Filter by tag" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">
+                  <div className="flex items-center gap-2">
+                    <Icon icon="lucide:list" className="w-4 h-4" />
+                    <span>All Tags</span>
+                  </div>
+                </SelectItem>
+                {tags.map((tag) => (
+                  <SelectItem key={tag} value={tag}>
+                    <div className="flex items-center gap-2">
+                      <Icon icon="lucide:tag" className="w-4 h-4" />
+                      <span>{tag}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
       </div>

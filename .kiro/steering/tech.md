@@ -9,7 +9,7 @@
 ## UI & Styling
 
 - **Tailwind CSS 4** with PostCSS
-- **HeroUI** (@heroui/react) - Pre-built accessible React components with Framer Motion animations
+- **Shadcn/ui** with Framer Motion animations
 - **Geist** font family (sans and mono variants)
 - Dark mode support built-in
 

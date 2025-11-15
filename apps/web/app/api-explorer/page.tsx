@@ -2,7 +2,7 @@
 
 import { ExplorerLayout } from "@/components/ExplorerLayout";
 import { EndpointList } from "@/components/EndpointList";
-import { EndpointDetail } from "@/components/EndpointDetail";
+import { RequestBuilder } from "@/components/RequestBuilder";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -55,9 +55,13 @@ function ApiExplorerContent() {
     />
   );
 
-  // Center Panel - Endpoint Detail or Empty State
+  // Center Panel - Request Builder or Empty State
   const centerPanel = selectedEndpoint ? (
-    <EndpointDetail endpoint={selectedEndpoint} allSchemas={spec.schemas} />
+    <RequestBuilder
+      endpoint={selectedEndpoint}
+      allSchemas={spec.schemas}
+      baseUrl={spec.info.servers?.[0]?.url}
+    />
   ) : (
     <Card className="h-full flex items-center justify-center">
       <CardContent className="text-center py-12">

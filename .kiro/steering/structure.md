@@ -45,12 +45,12 @@ splice/
 
 - Co-locate components with their routes when route-specific
 - Shared components should go in `app/components/` (create as needed)
-- Use HeroUI components for UI primitives
+- Use shadcn/ui components for UI primitives
 
 ### Styling Conventions
 
 - Tailwind utility classes for styling
-- HeroUI components provide base styling and animations
+- Shadcn/ui components provide base styling and animations
 - Dark mode support via Tailwind's `dark:` variant
 - Custom CSS in `globals.css` for global overrides only
 
