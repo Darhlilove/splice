@@ -436,7 +436,7 @@ export function ExecuteButton({
 
       {/* Execute Button */}
       <Button
-        onClick={executeRequest}
+        onClick={() => executeRequest()}
         disabled={isDisabled}
         size="lg"
         className="w-full"
