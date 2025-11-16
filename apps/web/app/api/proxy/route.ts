@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import axios, { AxiosError } from "axios";
 
 // Maximum timeout for proxied requests (30 seconds)
 const REQUEST_TIMEOUT = 30000;
@@ -51,8 +52,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { url, method, headers, body: requestBody } = body;
 
+    // Log incoming request for debugging
+    console.log("[Proxy] Incoming request:", {
+      url,
+      method,
+      hasHeaders: !!headers,
+      hasBody: !!requestBody,
+    });
+
     // Validate required fields
     if (!url || !method) {
+      console.error("[Proxy] Missing required fields:", { url, method });
       return NextResponse.json(
         { error: "Missing required fields: url and method" },
         { status: 400 }
@@ -61,6 +71,7 @@ export async function POST(request: NextRequest) {
 
     // Validate URL
     if (!isValidProxyTarget(url)) {
+      console.error("[Proxy] Invalid URL:", url);
       return NextResponse.json(
         {
           error:
@@ -70,56 +81,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prepare fetch options
-    const fetchOptions: RequestInit = {
+    // Record start time for duration measurement
+    const startTime = performance.now();
+
+    // Make the proxied request using axios
+    const response = await axios({
+      url,
       method: method.toUpperCase(),
       headers: headers || {},
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT),
-    };
+      data: requestBody,
+      timeout: REQUEST_TIMEOUT,
+      validateStatus: () => true, // Accept all status codes
+      maxRedirects: 5,
+    });
 
-    // Add body if present and method supports it
-    if (
-      requestBody &&
-      ["POST", "PUT", "PATCH"].includes(method.toUpperCase())
-    ) {
-      // If body is FormData, we need to handle it specially
-      if (requestBody instanceof FormData) {
-        fetchOptions.body = requestBody;
-      } else if (typeof requestBody === "string") {
-        fetchOptions.body = requestBody;
-      } else {
-        fetchOptions.body = JSON.stringify(requestBody);
-      }
-    }
-
-    // Record start time for duration measurement
-    const startTime = Date.now();
-
-    // Make the proxied request
-    const response = await fetch(url, fetchOptions);
-
-    // Calculate duration
-    const duration = Date.now() - startTime;
+    // Calculate response time
+    const responseTime = Math.round(performance.now() - startTime);
 
     // Extract response headers
     const responseHeaders: Record<string, string> = {};
-    response.headers.forEach((value, key) => {
-      responseHeaders[key] = value;
+    Object.entries(response.headers).forEach(([key, value]) => {
+      if (typeof value === "string") {
+        responseHeaders[key] = value;
+      } else if (Array.isArray(value)) {
+        responseHeaders[key] = value.join(", ");
+      }
     });
 
-    // Get response body
-    const contentType = response.headers.get("content-type") || "";
-    let responseBody: unknown;
-
-    if (contentType.includes("application/json")) {
-      try {
-        responseBody = await response.json();
-      } catch {
-        responseBody = await response.text();
-      }
-    } else {
-      responseBody = await response.text();
-    }
+    // Check if response is an error status (4xx or 5xx)
+    const isErrorStatus = response.status >= 400;
 
     // Return proxied response
     return NextResponse.json(
@@ -127,9 +117,15 @@ export async function POST(request: NextRequest) {
         status: response.status,
         statusText: response.statusText,
         headers: responseHeaders,
-        body: responseBody,
-        duration,
+        body: response.data,
+        responseTime,
         timestamp: new Date().toISOString(),
+        // Include error information for 4xx/5xx responses
+        ...(isErrorStatus && {
+          error: true,
+          errorType: response.status >= 500 ? "server" : "client",
+          errorMessage: `${response.status} ${response.statusText}`,
+        }),
       },
       {
         status: 200,
@@ -141,59 +137,69 @@ export async function POST(request: NextRequest) {
       }
     );
   } catch (error) {
-    // Handle timeout errors
-    if (error instanceof Error && error.name === "TimeoutError") {
-      return NextResponse.json(
-        {
-          error: "Request timeout",
-          message: `Request exceeded ${
-            REQUEST_TIMEOUT / 1000
-          } second timeout. The server may be slow or unresponsive.`,
-          type: "timeout",
-        },
-        { status: 504 }
-      );
-    }
+    // Handle axios errors
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError;
 
-    // Handle abort errors (also timeout related)
-    if (error instanceof Error && error.name === "AbortError") {
-      return NextResponse.json(
-        {
-          error: "Request timeout",
-          message: `Request was aborted after ${
-            REQUEST_TIMEOUT / 1000
-          } seconds.`,
-          type: "timeout",
-        },
-        { status: 504 }
-      );
-    }
-
-    // Handle network errors
-    if (error instanceof TypeError) {
-      const errorMessage = error.message.toLowerCase();
-      let type = "network";
-      let message =
-        "Failed to connect to the target server. Please check the URL and try again.";
-
-      // Detect specific network error types
-      if (errorMessage.includes("fetch failed")) {
-        message =
-          "Network request failed. The server may be unreachable or the URL may be incorrect.";
-      } else if (errorMessage.includes("cors")) {
-        type = "cors";
-        message =
-          "CORS error: The server does not allow requests from this origin.";
+      // Handle timeout errors
+      if (
+        axiosError.code === "ECONNABORTED" ||
+        axiosError.code === "ETIMEDOUT"
+      ) {
+        return NextResponse.json(
+          {
+            error: "Request timeout",
+            message: `Request exceeded ${
+              REQUEST_TIMEOUT / 1000
+            } second timeout. The server may be slow or unresponsive.`,
+            type: "timeout",
+          },
+          { status: 504 }
+        );
       }
 
+      // Handle network errors
+      if (
+        axiosError.code === "ENOTFOUND" ||
+        axiosError.code === "ECONNREFUSED"
+      ) {
+        return NextResponse.json(
+          {
+            error: "Network error",
+            message:
+              "Failed to connect to the target server. The server may be unreachable or the URL may be incorrect.",
+            type: "network",
+            details: axiosError.message,
+          },
+          { status: 502 }
+        );
+      }
+
+      // Handle other network errors
+      if (!axiosError.response) {
+        return NextResponse.json(
+          {
+            error: "Network error",
+            message:
+              "Network request failed. Please check the URL and your internet connection.",
+            type: "network",
+            details: axiosError.message,
+          },
+          { status: 502 }
+        );
+      }
+
+      // If we have a response, it means the request went through but got an error status
+      // This shouldn't happen since we use validateStatus: () => true
+      // But handle it just in case
       return NextResponse.json(
         {
-          error: "Network error",
-          message,
-          type,
-          details: error.message,
+          error: "Request error",
+          message: axiosError.message,
+          type: "server",
+          details: axiosError.response?.data,
         },
-        { status: 502 }
+        { status: axiosError.response?.status || 500 }
       );
     }
 

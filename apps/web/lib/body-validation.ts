@@ -33,10 +33,13 @@ export function validateRequestBody(
         const schemaErrors = validateValueAgainstSchema(parsed, schema, "body");
         validationErrors.push(...schemaErrors);
       } catch (error) {
+        const errorMessage =
+          error instanceof Error
+            ? `Invalid JSON syntax: ${error.message}`
+            : "Invalid JSON syntax. Please check your JSON formatting.";
         validationErrors.push({
           field: "body",
-          message:
-            error instanceof Error ? error.message : "Invalid JSON syntax",
+          message: errorMessage,
           type: "json",
         });
       }
@@ -85,7 +88,7 @@ function validateValueAgainstSchema(
     if (actualType !== schema.type && actualType !== "null") {
       errors.push({
         field: fieldPath,
-        message: `Expected type ${schema.type}, got ${actualType}`,
+        message: `Type mismatch: expected ${schema.type}, but received ${actualType}`,
         type: "type",
       });
       return errors; // Don't continue validation if type is wrong
@@ -103,7 +106,7 @@ function validateValueAgainstSchema(
             if (!regex.test(value)) {
               errors.push({
                 field: fieldPath,
-                message: `Value does not match pattern: ${schema.pattern}`,
+                message: `Value does not match the required pattern: ${schema.pattern}`,
                 type: "pattern",
               });
             }
@@ -121,7 +124,7 @@ function validateValueAgainstSchema(
         ) {
           errors.push({
             field: fieldPath,
-            message: `Minimum length is ${schema.minLength}`,
+            message: `String must be at least ${schema.minLength} characters long`,
             type: "min",
           });
         }
@@ -132,7 +135,7 @@ function validateValueAgainstSchema(
         ) {
           errors.push({
             field: fieldPath,
-            message: `Maximum length is ${schema.maxLength}`,
+            message: `String must be at most ${schema.maxLength} characters long`,
             type: "max",
           });
         }
@@ -141,7 +144,9 @@ function validateValueAgainstSchema(
         if (schema.enum && !schema.enum.includes(value)) {
           errors.push({
             field: fieldPath,
-            message: `Value must be one of: ${schema.enum.join(", ")}`,
+            message: `Value must be one of the following: ${schema.enum.join(
+              ", "
+            )}`,
             type: "enum",
           });
         }
@@ -159,7 +164,7 @@ function validateValueAgainstSchema(
         ) {
           errors.push({
             field: fieldPath,
-            message: `Minimum value is ${schema.minimum}`,
+            message: `Number must be at least ${schema.minimum}`,
             type: "min",
           });
         }
@@ -170,7 +175,7 @@ function validateValueAgainstSchema(
         ) {
           errors.push({
             field: fieldPath,
-            message: `Maximum value is ${schema.maximum}`,
+            message: `Number must be at most ${schema.maximum}`,
             type: "max",
           });
         }
@@ -179,7 +184,9 @@ function validateValueAgainstSchema(
         if (schema.enum && !schema.enum.includes(value)) {
           errors.push({
             field: fieldPath,
-            message: `Value must be one of: ${schema.enum.join(", ")}`,
+            message: `Value must be one of the following: ${schema.enum.join(
+              ", "
+            )}`,
             type: "enum",
           });
         }
@@ -196,7 +203,9 @@ function validateValueAgainstSchema(
         ) {
           errors.push({
             field: fieldPath,
-            message: `Minimum number of items is ${schema.minItems}`,
+            message: `Array must contain at least ${schema.minItems} item${
+              schema.minItems !== 1 ? "s" : ""
+            }`,
             type: "min",
           });
         }
@@ -207,7 +216,9 @@ function validateValueAgainstSchema(
         ) {
           errors.push({
             field: fieldPath,
-            message: `Maximum number of items is ${schema.maxItems}`,
+            message: `Array must contain at most ${schema.maxItems} item${
+              schema.maxItems !== 1 ? "s" : ""
+            }`,
             type: "max",
           });
         }

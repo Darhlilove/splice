@@ -18,7 +18,7 @@ describe("validateParameter", () => {
 
       const result = validateParameter(parameter, "");
       expect(result.isValid).toBe(false);
-      expect(result.error).toBe("This field is required");
+      expect(result.error).toBe("This field is required and cannot be empty");
     });
 
     test("should fail when required field is null", () => {
@@ -31,7 +31,7 @@ describe("validateParameter", () => {
 
       const result = validateParameter(parameter, null);
       expect(result.isValid).toBe(false);
-      expect(result.error).toBe("This field is required");
+      expect(result.error).toBe("This field is required and cannot be empty");
     });
 
     test("should pass when required field has value", () => {
@@ -71,7 +71,7 @@ describe("validateParameter", () => {
 
       const result = validateParameter(parameter, 123);
       expect(result.isValid).toBe(false);
-      expect(result.error).toBe("Must be a string");
+      expect(result.error).toBe("Must be a text string value");
     });
 
     test("should fail when number expected but string provided", () => {
@@ -84,7 +84,7 @@ describe("validateParameter", () => {
 
       const result = validateParameter(parameter, "not a number");
       expect(result.isValid).toBe(false);
-      expect(result.error).toBe("Must be a number");
+      expect(result.error).toBe("Must be a numeric number value");
     });
 
     test("should fail when integer expected but float provided", () => {
@@ -97,7 +97,9 @@ describe("validateParameter", () => {
 
       const result = validateParameter(parameter, 3.14);
       expect(result.isValid).toBe(false);
-      expect(result.error).toBe("Must be an integer");
+      expect(result.error).toBe(
+        "Must be a whole number (integer) without decimals"
+      );
     });
 
     test("should pass when boolean type matches", () => {

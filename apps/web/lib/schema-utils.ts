@@ -5,10 +5,11 @@
 import type { SchemaObject } from "@splice/openapi";
 
 /**
- * Format a schema object for display, handling $ref pointers
+ * Format a schema object for display, resolving $ref pointers
  */
 export function formatSchemaForDisplay(
   schema: SchemaObject | undefined,
+  allSchemas?: Record<string, SchemaObject>,
   maxDepth = 3,
   currentDepth = 0
 ): string {
@@ -16,8 +17,19 @@ export function formatSchemaForDisplay(
     return "{}";
   }
 
-  // Handle $ref pointers
+  // Resolve $ref pointers
   if (typeof schema === "object" && "$ref" in schema && schema.$ref) {
+    const refName = schema.$ref.split("/").pop();
+    if (refName && allSchemas && allSchemas[refName]) {
+      // Resolve the reference and format it
+      return formatSchemaForDisplay(
+        allSchemas[refName],
+        allSchemas,
+        maxDepth,
+        currentDepth + 1
+      );
+    }
+    // If we can't resolve, show the reference name
     return `{ "$ref": "${schema.$ref}" }`;
   }
 
@@ -28,7 +40,12 @@ export function formatSchemaForDisplay(
 
   try {
     // Create a simplified version for display
-    const simplified = simplifySchema(schema, currentDepth, maxDepth);
+    const simplified = simplifySchema(
+      schema,
+      allSchemas,
+      currentDepth,
+      maxDepth
+    );
     return JSON.stringify(simplified, null, 2);
   } catch (error) {
     console.error("Error formatting schema:", error);
@@ -41,6 +58,7 @@ export function formatSchemaForDisplay(
  */
 function simplifySchema(
   schema: SchemaObject,
+  allSchemas: Record<string, SchemaObject> | undefined,
   currentDepth: number,
   maxDepth: number
 ): unknown {
@@ -48,8 +66,19 @@ function simplifySchema(
     return schema;
   }
 
-  // Handle $ref
+  // Handle $ref - resolve it
   if ("$ref" in schema && schema.$ref) {
+    const refName = schema.$ref.split("/").pop();
+    if (refName && allSchemas && allSchemas[refName]) {
+      // Resolve and simplify the referenced schema
+      return simplifySchema(
+        allSchemas[refName],
+        allSchemas,
+        currentDepth + 1,
+        maxDepth
+      );
+    }
+    // If we can't resolve, show the reference
     return { $ref: schema.$ref };
   }
 
@@ -59,7 +88,12 @@ function simplifySchema(
       return ["..."];
     }
     return schema.map((item) =>
-      simplifySchema(item as SchemaObject, currentDepth + 1, maxDepth)
+      simplifySchema(
+        item as SchemaObject,
+        allSchemas,
+        currentDepth + 1,
+        maxDepth
+      )
     );
   }
 
@@ -95,6 +129,7 @@ function simplifySchema(
           for (const [propKey, propValue] of Object.entries(value)) {
             props[propKey] = simplifySchema(
               propValue as SchemaObject,
+              allSchemas,
               currentDepth + 1,
               maxDepth
             );
@@ -114,6 +149,7 @@ function simplifySchema(
         } else {
           result[key] = simplifySchema(
             value as SchemaObject,
+            allSchemas,
             currentDepth + 1,
             maxDepth
           );

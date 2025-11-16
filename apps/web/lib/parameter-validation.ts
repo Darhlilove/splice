@@ -83,7 +83,7 @@ function validateRequired(value: ParameterValue): ValidationResult {
   if (value === null || value === undefined || value === "") {
     return {
       isValid: false,
-      error: "This field is required",
+      error: "This field is required and cannot be empty",
       type: "required",
     };
   }
@@ -92,7 +92,7 @@ function validateRequired(value: ParameterValue): ValidationResult {
   if (Array.isArray(value) && value.length === 0) {
     return {
       isValid: false,
-      error: "This field is required",
+      error: "This field is required and must contain at least one value",
       type: "required",
     };
   }
@@ -118,7 +118,7 @@ function validateType(
       if (typeof value !== "string") {
         return {
           isValid: false,
-          error: "Must be a string",
+          error: "Must be a text string value",
           type: "type",
         };
       }
@@ -129,14 +129,14 @@ function validateType(
       if (typeof value !== "number") {
         return {
           isValid: false,
-          error: `Must be a ${type}`,
+          error: `Must be a numeric ${type} value`,
           type: "type",
         };
       }
       if (type === "integer" && !Number.isInteger(value)) {
         return {
           isValid: false,
-          error: "Must be an integer",
+          error: "Must be a whole number (integer) without decimals",
           type: "type",
         };
       }
@@ -146,7 +146,7 @@ function validateType(
       if (typeof value !== "boolean") {
         return {
           isValid: false,
-          error: "Must be a boolean",
+          error: "Must be a boolean value (true or false)",
           type: "type",
         };
       }
@@ -156,7 +156,7 @@ function validateType(
       if (!Array.isArray(value)) {
         return {
           isValid: false,
-          error: "Must be an array",
+          error: "Must be an array of values",
           type: "type",
         };
       }

@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,6 +61,12 @@ export function PresetManager({
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [newPresetName, setNewPresetName] = useState("");
   const [saveError, setSaveError] = useState("");
+
+  // Reload presets when endpoint changes
+  React.useEffect(() => {
+    setPresets(loadPresets(method, path));
+    setSelectedPresetName(""); // Clear selection when endpoint changes
+  }, [method, path]);
 
   // Refresh presets from localStorage
   const refreshPresets = () => {

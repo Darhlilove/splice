@@ -3,14 +3,18 @@
 import { ExplorerLayout } from "@/components/ExplorerLayout";
 import { EndpointList } from "@/components/EndpointList";
 import { RequestBuilder } from "@/components/RequestBuilder";
+import { HistorySidebar } from "@/components/HistorySidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@iconify/react";
 import { useStoredSpec } from "@/hooks/use-stored-spec";
+import { useRequestHistory } from "@/hooks/use-request-history";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useState } from "react";
 import type { Endpoint } from "@splice/openapi";
+import type { ResponseData } from "@/types/request-builder";
+import { toast } from "sonner";
 
 function ApiExplorerContent() {
   const searchParams = useSearchParams();
@@ -20,6 +24,14 @@ function ApiExplorerContent() {
   const [selectedEndpoint, setSelectedEndpoint] = useState<Endpoint | null>(
     null
   );
+
+  // History management
+  const { history, selectedEntry, selectEntry, clearHistory, exportHistory } =
+    useRequestHistory();
+
+  // State for displaying historical response
+  const [displayedResponse, setDisplayedResponse] =
+    useState<ResponseData | null>(null);
 
   if (!hasSpec || !spec) {
     return (
@@ -55,12 +67,16 @@ function ApiExplorerContent() {
     />
   );
 
+  // Get base URL from spec or use a default
+  const baseUrl =
+    spec.info.servers?.[0]?.url || "https://petstore.swagger.io/v2";
+
   // Center Panel - Request Builder or Empty State
   const centerPanel = selectedEndpoint ? (
     <RequestBuilder
       endpoint={selectedEndpoint}
       allSchemas={spec.schemas}
-      baseUrl={spec.info.servers?.[0]?.url}
+      baseUrl={baseUrl}
     />
   ) : (
     <Card className="h-full flex items-center justify-center">
@@ -77,129 +93,45 @@ function ApiExplorerContent() {
     </Card>
   );
 
-  // Right Panel - Code Samples (auto-generated)
+  // Handle history entry selection
+  const handleSelectHistoryEntry = (entry: (typeof history)[0]) => {
+    selectEntry(entry);
+    setDisplayedResponse(entry.response);
+    toast.success("History Entry Loaded", {
+      description: `${entry.method.toUpperCase()} ${entry.endpoint}`,
+      duration: 2000,
+    });
+  };
+
+  // Handle clear history
+  const handleClearHistory = () => {
+    clearHistory();
+    setDisplayedResponse(null);
+    toast.success("History Cleared", {
+      description: "All request history has been cleared",
+      duration: 2000,
+    });
+  };
+
+  // Handle export history
+  const handleExportHistory = () => {
+    exportHistory();
+    toast.success("History Exported", {
+      description: "Request history has been downloaded as JSON",
+      duration: 2000,
+    });
+  };
+
+  // Right Panel - History Sidebar
   const rightPanel = (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Code Samples</h2>
-        {selectedEndpoint && (
-          <Badge variant="outline" className="text-xs">
-            Auto-generated
-          </Badge>
-        )}
-      </div>
-      {selectedEndpoint ? (
-        <div className="space-y-3">
-          {/* cURL */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Icon
-                  icon="simple-icons:curl"
-                  className="w-4 h-4 text-emerald-600 dark:text-emerald-400"
-                />
-                cURL
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <pre className="text-xs bg-muted p-3 rounded overflow-x-auto scrollbar-thin">
-                {`curl -X ${selectedEndpoint.method.toUpperCase()} \\
-  '${spec.info.servers?.[0]?.url || "https://api.example.com"}${
-                  selectedEndpoint.path
-                }' \\
-  -H 'Content-Type: application/json'${
-    selectedEndpoint.requestBody
-      ? ` \\
-  -d '{
-    "key": "value"
-  }'`
-      : ""
-  }`}
-              </pre>
-            </CardContent>
-          </Card>
-
-          {/* JavaScript/Fetch */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Icon
-                  icon="simple-icons:javascript"
-                  className="w-4 h-4 text-yellow-500 dark:text-yellow-400"
-                />
-                JavaScript
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <pre className="text-xs bg-muted p-3 rounded overflow-x-auto scrollbar-thin">
-                {`fetch('${
-                  spec.info.servers?.[0]?.url || "https://api.example.com"
-                }${selectedEndpoint.path}', {
-  method: '${selectedEndpoint.method.toUpperCase()}',
-  headers: {
-    'Content-Type': 'application/json'
-  }${
-    selectedEndpoint.requestBody
-      ? `,
-  body: JSON.stringify({
-    key: 'value'
-  })`
-      : ""
-  }
-})
-  .then(res => res.json())
-  .then(data => console.log(data));`}
-              </pre>
-            </CardContent>
-          </Card>
-
-          {/* Python */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Icon
-                  icon="simple-icons:python"
-                  className="w-4 h-4 text-blue-600 dark:text-blue-400"
-                />
-                Python
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <pre className="text-xs bg-muted p-3 rounded overflow-x-auto scrollbar-thin">
-                {`import requests
-
-url = '${spec.info.servers?.[0]?.url || "https://api.example.com"}${
-                  selectedEndpoint.path
-                }'
-headers = {'Content-Type': 'application/json'}${
-                  selectedEndpoint.requestBody
-                    ? `
-data = {'key': 'value'}
-
-response = requests.${selectedEndpoint.method}(url, headers=headers, json=data)`
-                    : `
-
-response = requests.${selectedEndpoint.method}(url, headers=headers)`
-                }
-print(response.json())`}
-              </pre>
-            </CardContent>
-          </Card>
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="text-center py-8">
-            <Icon
-              icon="lucide:code-2"
-              className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50"
-            />
-            <p className="text-sm text-muted-foreground">
-              Select an endpoint to see code samples
-            </p>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+    <HistorySidebar
+      history={history}
+      onSelectEntry={handleSelectHistoryEntry}
+      onClearHistory={handleClearHistory}
+      onExportHistory={handleExportHistory}
+      selectedEntryId={selectedEntry?.id}
+      maxEntries={10}
+    />
   );
 
   return (

@@ -3,8 +3,11 @@
 import { ReactNode } from "react";
 import { Icon } from "@iconify/react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import { useMockServer } from "@/contexts/mock-server-context";
+import { Server } from "lucide-react";
 
 interface ExplorerLayoutProps {
   leftPanel: ReactNode;
@@ -22,6 +25,7 @@ export function ExplorerLayout({
   specId,
 }: ExplorerLayoutProps) {
   const router = useRouter();
+  const { config: mockServerConfig, toggleMockServer } = useMockServer();
 
   const handleBack = () => {
     if (specId) {
@@ -49,6 +53,22 @@ export function ExplorerLayout({
               {specTitle || "API Explorer"}
             </h1>
           </div>
+          <Button
+            variant={mockServerConfig.enabled ? "default" : "outline"}
+            onClick={toggleMockServer}
+            className="rounded-full"
+          >
+            <Server className="w-4 h-4 mr-2" />
+            Mock Server
+            {mockServerConfig.enabled && (
+              <Badge
+                variant="secondary"
+                className="ml-2 bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30"
+              >
+                ON
+              </Badge>
+            )}
+          </Button>
           <Button
             variant="outline"
             onClick={() => router.push("/upload")}

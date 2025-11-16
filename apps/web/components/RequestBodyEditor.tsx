@@ -239,7 +239,7 @@ export function RequestBodyEditor({
             <Card>
               <CardContent className="pt-4">
                 <pre className="text-xs overflow-auto max-h-[200px] p-2 bg-muted rounded">
-                  {formatSchemaForDisplay(schema)}
+                  {formatSchemaForDisplay(schema, allSchemas)}
                 </pre>
               </CardContent>
             </Card>

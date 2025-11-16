@@ -21,9 +21,10 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { executeRequestWithState } from "@/lib/request-executor";
-import { Loader2, Play, AlertCircle, RefreshCw } from "lucide-react";
+import { Loader2, Play, AlertCircle, RefreshCw, Server } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useMockServer } from "@/contexts/mock-server-context";
 
 interface RequestBuilderProps {
   endpoint: Endpoint;
@@ -63,6 +64,14 @@ export function RequestBuilder({
   baseUrl = "",
   securitySchemes,
 }: RequestBuilderProps) {
+  // Mock server context
+  const { config: mockServerConfig } = useMockServer();
+
+  // Determine the effective base URL (mock or real)
+  const effectiveBaseUrl = mockServerConfig.enabled
+    ? mockServerConfig.baseUrl
+    : baseUrl;
+
   // State for parameters
   const [parameters, setParameters] = React.useState<
     Record<string, ParameterValue>
@@ -104,6 +113,24 @@ export function RequestBuilder({
 
   // State for last request config (for retry)
   const [lastRequestFailed, setLastRequestFailed] = React.useState(false);
+
+  // Clear response and errors when endpoint changes
+  React.useEffect(() => {
+    setResponse(null);
+    setValidationErrors([]);
+    setErrorMessage(null);
+    setLastRequestFailed(false);
+    setParameters({});
+    setRequestBody("");
+
+    // Reset content type to first available
+    if (endpoint.requestBody) {
+      const contentTypes = Object.keys(endpoint.requestBody.content);
+      setContentType(contentTypes[0] || "application/json");
+    } else {
+      setContentType("application/json");
+    }
+  }, [endpoint]);
 
   // Create parameter locations map for RequestPreview
   const parameterLocations = React.useMemo(() => {
@@ -208,7 +235,7 @@ export function RequestBuilder({
     // Execute request with state management
     await executeRequestWithState(
       endpoint,
-      baseUrl,
+      effectiveBaseUrl,
       parameters,
       requestBody,
       contentType,
@@ -246,16 +273,38 @@ export function RequestBuilder({
           });
         }
       },
-      () => {
-        // Success callback
+      (responseData) => {
+        // Success callback - save to history
         setLastRequestFailed(false);
+
+        // Import and save to history store
+        const { getHistoryStore } = require("@/lib/history-store");
+        const historyStore = getHistoryStore();
+        historyStore.addEntry(
+          endpoint.method,
+          endpoint.path,
+          parameters,
+          responseData,
+          requestBody,
+          authentication
+        );
+
+        console.log("[RequestBuilder] Saved to history");
+
         toast.success("Request Successful", {
           description: "The API request completed successfully.",
           duration: 3000,
         });
       }
     );
-  }, [endpoint, baseUrl, parameters, requestBody, contentType, authentication]);
+  }, [
+    endpoint,
+    effectiveBaseUrl,
+    parameters,
+    requestBody,
+    contentType,
+    authentication,
+  ]);
 
   /**
    * Handle retry request
@@ -326,7 +375,7 @@ export function RequestBuilder({
       <Card>
         <CardHeader>
           <div className="space-y-3">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <Badge
                 variant={getMethodColor(endpoint.method)}
                 className="font-mono text-sm px-3 py-1"
@@ -334,6 +383,15 @@ export function RequestBuilder({
                 {endpoint.method.toUpperCase()}
               </Badge>
               <code className="text-lg font-mono">{endpoint.path}</code>
+              {mockServerConfig.enabled && (
+                <Badge
+                  variant="outline"
+                  className="bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20"
+                >
+                  <Server className="w-3 h-3 mr-1" />
+                  Mock Server
+                </Badge>
+              )}
             </div>
             {endpoint.summary && (
               <CardTitle className="text-xl">{endpoint.summary}</CardTitle>
@@ -342,6 +400,22 @@ export function RequestBuilder({
               <p className="text-sm text-muted-foreground">
                 {endpoint.description}
               </p>
+            )}
+            {mockServerConfig.enabled && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-purple-500/5 border border-purple-500/20">
+                <Server className="w-4 h-4 text-purple-700 dark:text-purple-400 mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-purple-700 dark:text-purple-400">
+                    Using Mock Server
+                  </p>
+                  <p className="text-muted-foreground">
+                    Requests will be sent to{" "}
+                    <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                      {mockServerConfig.baseUrl}
+                    </code>
+                  </p>
+                </div>
+              </div>
             )}
           </div>
         </CardHeader>
@@ -401,7 +475,7 @@ export function RequestBuilder({
       {/* Request Preview */}
       <RequestPreview
         method={endpoint.method}
-        baseUrl={baseUrl}
+        baseUrl={effectiveBaseUrl}
         path={endpoint.path}
         parameters={parameters}
         parameterLocations={parameterLocations}

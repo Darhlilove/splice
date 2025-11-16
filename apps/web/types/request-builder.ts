@@ -52,7 +52,9 @@ export interface ResponseData {
   headers: Record<string, string>;
   body: unknown;
   duration: number;
+  responseTime: number; // Alias for duration to match APIResponse
   timestamp: Date;
+  contentType: string;
 }
 
 // Preset configuration

@@ -1,273 +1,461 @@
 "use client";
 
 import * as React from "react";
-import { ResponseData } from "@/types/request-builder";
+import dynamic from "next/dynamic";
+import { APIResponse, RequestError } from "@/lib/request-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
-  Copy,
-  Download,
-  ChevronDown,
-  ChevronUp,
-  FileJson,
-  FileText,
+  Loader2,
+  Clock,
+  AlertCircle,
+  WifiOff,
+  Timer,
+  XCircle,
 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { ResponseFormatter, ResponseFormat } from "./ResponseFormatter";
 
-interface ResponseViewerProps {
-  response: ResponseData;
-}
-
-/**
- * Gets the appropriate color variant for the status code badge
- */
-function getStatusColor(
-  status: number
-): "default" | "secondary" | "destructive" {
-  if (status >= 200 && status < 300) return "default"; // Green for 2xx
-  if (status >= 400 && status < 500) return "secondary"; // Orange for 4xx
-  if (status >= 500) return "destructive"; // Red for 5xx
-  return "default";
-}
+// Lazy load Monaco Editor for better syntax highlighting
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  loading: () => <ResponseBodySkeleton />,
+  ssr: false,
+});
 
 /**
- * Determines the language for syntax highlighting based on content type
+ * Props for the ResponseViewer component
  */
-function getLanguageFromContentType(contentType?: string): string {
-  if (!contentType) return "text";
-
-  if (contentType.includes("json")) return "json";
-  if (contentType.includes("xml")) return "xml";
-  if (contentType.includes("html")) return "html";
-  if (contentType.includes("javascript")) return "javascript";
-  if (contentType.includes("css")) return "css";
-
-  return "text";
+export interface ResponseViewerProps {
+  response: (APIResponse | ResponseData) | null;
+  loading?: boolean;
+  error?: RequestError;
+  onRetry?: () => void;
+  retryCount?: number;
+  maxRetries?: number;
 }
 
+// Import ResponseData type for compatibility
+import type { ResponseData } from "@/types/request-builder";
+
 /**
- * Formats the response body for display
+ * Get status code color based on HTTP status
  */
-function formatResponseBody(body: unknown, isPretty: boolean): string {
-  if (body === null || body === undefined) return "";
-
-  if (typeof body === "string") {
-    if (!isPretty) return body;
-
-    try {
-      // Try to parse and prettify JSON
-      const parsed = JSON.parse(body);
-      return JSON.stringify(parsed, null, 2);
-    } catch {
-      // Return as-is if not valid JSON
-      return body;
-    }
+function getStatusColor(status: number): string {
+  if (status >= 200 && status < 300) {
+    return "bg-green-500/10 text-green-500 border-green-500/20";
+  } else if (status >= 400 && status < 500) {
+    return "bg-orange-500/10 text-orange-500 border-orange-500/20";
+  } else if (status >= 500) {
+    return "bg-red-500/10 text-red-500 border-red-500/20";
   }
-
-  if (typeof body === "object") {
-    return isPretty ? JSON.stringify(body, null, 2) : JSON.stringify(body);
-  }
-
-  return String(body);
+  return "bg-blue-500/10 text-blue-500 border-blue-500/20";
 }
 
 /**
- * ResponseViewer component
- * Displays HTTP response with status, headers, and body with syntax highlighting
+ * Get error icon based on error type
  */
-export function ResponseViewer({ response }: ResponseViewerProps) {
-  const [isHeadersOpen, setIsHeadersOpen] = React.useState(false);
-  const [isPrettyPrint, setIsPrettyPrint] = React.useState(true);
-  const [copySuccess, setCopySuccess] = React.useState(false);
+function getErrorIcon(type: RequestError["type"]) {
+  switch (type) {
+    case "network":
+      return <WifiOff className="h-5 w-5" />;
+    case "timeout":
+      return <Timer className="h-5 w-5" />;
+    case "validation":
+      return <AlertCircle className="h-5 w-5" />;
+    case "server":
+      return <XCircle className="h-5 w-5" />;
+    default:
+      return <AlertCircle className="h-5 w-5" />;
+  }
+}
 
-  const contentType =
-    response.headers["content-type"] || response.headers["Content-Type"] || "";
-  const language = getLanguageFromContentType(contentType);
-  const formattedBody = React.useMemo(
-    () => formatResponseBody(response.body, isPrettyPrint),
-    [response.body, isPrettyPrint]
+/**
+ * Format response time in milliseconds
+ */
+function formatResponseTime(ms: number): string {
+  if (ms < 1000) {
+    return `${Math.round(ms)}ms`;
+  }
+  return `${(ms / 1000).toFixed(2)}s`;
+}
+
+/**
+ * Loading skeleton for response body
+ */
+function ResponseBodySkeleton() {
+  return (
+    <div className="rounded-md border bg-muted/50 p-4 space-y-2 animate-pulse">
+      <div className="h-4 bg-muted-foreground/20 rounded w-3/4"></div>
+      <div className="h-4 bg-muted-foreground/20 rounded w-full"></div>
+      <div className="h-4 bg-muted-foreground/20 rounded w-5/6"></div>
+      <div className="h-4 bg-muted-foreground/20 rounded w-2/3"></div>
+      <div className="h-4 bg-muted-foreground/20 rounded w-4/5"></div>
+    </div>
   );
+}
 
-  /**
-   * Copy response body to clipboard
-   */
-  const handleCopyResponse = async () => {
-    try {
-      await navigator.clipboard.writeText(formattedBody);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy response:", err);
-    }
-  };
-
-  /**
-   * Download response as a file
-   */
-  const handleDownloadResponse = () => {
-    const blob = new Blob([formattedBody], {
-      type: contentType || "text/plain",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-
-    // Determine file extension based on content type
-    let extension = "txt";
-    if (contentType.includes("json")) extension = "json";
-    else if (contentType.includes("xml")) extension = "xml";
-    else if (contentType.includes("html")) extension = "html";
-
-    a.download = `response-${Date.now()}.${extension}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  /**
-   * Toggle between pretty print and raw view
-   */
-  const handleTogglePrettyPrint = () => {
-    setIsPrettyPrint(!isPrettyPrint);
-  };
-
+/**
+ * Loading skeleton for entire response viewer
+ */
+function ResponseViewerSkeleton() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            <CardTitle className="text-base">Response</CardTitle>
-            <Badge
-              variant={getStatusColor(response.status)}
-              className="font-mono text-xs sm:text-sm"
-            >
-              {response.status} {response.statusText}
-            </Badge>
-            <span className="text-xs sm:text-sm text-muted-foreground">
-              {response.duration}ms
-            </span>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-24 bg-muted-foreground/20 rounded animate-pulse"></div>
+            <div className="h-6 w-16 bg-muted-foreground/20 rounded animate-pulse"></div>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            {language === "json" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleTogglePrettyPrint}
-                className="h-8"
-                aria-label={
-                  isPrettyPrint ? "Show raw JSON" : "Show pretty JSON"
-                }
-              >
-                {isPrettyPrint ? (
-                  <>
-                    <FileText className="h-3 w-3 sm:mr-1" aria-hidden="true" />
-                    <span className="hidden sm:inline">Raw</span>
-                  </>
-                ) : (
-                  <>
-                    <FileJson className="h-3 w-3 sm:mr-1" aria-hidden="true" />
-                    <span className="hidden sm:inline">Pretty</span>
-                  </>
-                )}
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyResponse}
-              className="h-8"
-              aria-label="Copy response to clipboard"
-            >
-              <Copy className="h-3 w-3 sm:mr-1" aria-hidden="true" />
-              <span className="hidden sm:inline">
-                {copySuccess ? "Copied!" : "Copy"}
-              </span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDownloadResponse}
-              className="h-8"
-              aria-label="Download response as file"
-            >
-              <Download className="h-3 w-3 sm:mr-1" aria-hidden="true" />
-              <span className="hidden sm:inline">Download</span>
-            </Button>
+          <div className="flex gap-2">
+            <div className="h-8 w-20 bg-muted-foreground/20 rounded animate-pulse"></div>
+            <div className="h-8 w-20 bg-muted-foreground/20 rounded animate-pulse"></div>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Response Headers */}
-        <Collapsible open={isHeadersOpen} onOpenChange={setIsHeadersOpen}>
-          <CollapsibleTrigger className="flex items-center justify-between w-full hover:bg-muted/50 p-2 rounded transition-colors">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Headers</span>
-              <Badge variant="secondary" className="text-xs">
-                {Object.keys(response.headers).length}
-              </Badge>
+        <div className="h-10 bg-muted-foreground/20 rounded animate-pulse"></div>
+        <Separator />
+        <ResponseBodySkeleton />
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * ResponseViewer component (memoized for performance)
+ * Displays API responses with syntax highlighting, headers, and error handling
+ */
+export const ResponseViewer = React.memo(function ResponseViewer({
+  response,
+  loading = false,
+  error,
+  onRetry,
+  retryCount = 0,
+  maxRetries = 3,
+}: ResponseViewerProps) {
+  const [headersOpen, setHeadersOpen] = React.useState(false);
+  const [errorDetailsOpen, setErrorDetailsOpen] = React.useState(false);
+  const [format, setFormat] = React.useState<ResponseFormat>("pretty");
+
+  // Show loading state with skeleton
+  if (loading) {
+    return <ResponseViewerSkeleton />;
+  }
+
+  // Get user-friendly error message based on error type
+  const getErrorMessage = (error: RequestError): string => {
+    switch (error.type) {
+      case "timeout":
+        return "The request took too long to complete. The server may be slow or unresponsive.";
+      case "network":
+        return "Unable to connect to the server. Please check your internet connection and the URL.";
+      case "validation":
+        return "Please fix the validation errors before executing the request.";
+      case "server":
+        return error.message || "The server returned an error response.";
+      default:
+        return error.message || "An unexpected error occurred.";
+    }
+  };
+
+  // Show error state
+  if (error) {
+    const canRetry =
+      (error.type === "network" || error.type === "timeout") &&
+      retryCount < maxRetries;
+
+    return (
+      <Card className="border-destructive">
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <div className="text-destructive mt-0.5">
+              {getErrorIcon(error.type)}
             </div>
-            {isHeadersOpen ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
+            <div className="flex-1 space-y-1">
+              <CardTitle className="text-destructive text-lg">
+                Request Failed
+              </CardTitle>
+              <p className="text-sm text-destructive/90 font-medium">
+                {getErrorMessage(error)}
+              </p>
+              {retryCount > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Retry attempt {retryCount} of {maxRetries}
+                </p>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Error Details */}
+          {error.details && (
+            <Collapsible
+              open={errorDetailsOpen}
+              onOpenChange={setErrorDetailsOpen}
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start"
+                >
+                  <AlertCircle className="mr-2 h-4 w-4" />
+                  {errorDetailsOpen ? "Hide" : "Show"} Error Details
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2">
+                <div className="rounded-md bg-muted p-4">
+                  <pre className="text-xs overflow-auto">
+                    {typeof error.details === "string"
+                      ? error.details
+                      : JSON.stringify(error.details, null, 2)}
+                  </pre>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* Retry Button */}
+          {onRetry && (
+            <div className="space-y-2">
+              <Button
+                onClick={onRetry}
+                variant="outline"
+                className="w-full"
+                disabled={!canRetry}
+              >
+                {canRetry
+                  ? "Retry Request"
+                  : `Max retries reached (${maxRetries})`}
+              </Button>
+              {canRetry && (
+                <p className="text-xs text-center text-muted-foreground">
+                  The request will be retried automatically with exponential
+                  backoff
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show empty state
+  if (!response) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-center py-12">
+            <p className="text-sm text-muted-foreground">
+              Execute a request to see the response
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Detect content type and format body
+  const contentType = (response.contentType || "").toLowerCase();
+  const isJson =
+    contentType.includes("application/json") ||
+    contentType.includes("application/vnd.api+json");
+  const isXml =
+    contentType.includes("text/xml") || contentType.includes("application/xml");
+  const isHtml = contentType.includes("text/html");
+
+  console.log("[ResponseViewer] Response data:", {
+    contentType,
+    bodyType: typeof response.body,
+    body: response.body,
+    isJson,
+  });
+
+  let bodyContent: string;
+  let language: string;
+
+  try {
+    if (isJson && typeof response.body === "object") {
+      // Check if body is empty
+      const isEmpty =
+        response.body === null ||
+        response.body === undefined ||
+        (typeof response.body === "object" &&
+          Object.keys(response.body).length === 0);
+
+      if (isEmpty) {
+        bodyContent = "{}";
+      } else {
+        // Apply formatting based on format state
+        if (format === "minified") {
+          bodyContent = JSON.stringify(response.body);
+        } else {
+          bodyContent = JSON.stringify(response.body, null, 2);
+        }
+      }
+      language = "json";
+    } else if (isJson && typeof response.body === "string") {
+      // Try to parse and re-stringify for formatting
+      try {
+        const parsed = JSON.parse(response.body);
+        if (format === "minified") {
+          bodyContent = JSON.stringify(parsed);
+        } else {
+          bodyContent = JSON.stringify(parsed, null, 2);
+        }
+      } catch {
+        bodyContent = response.body;
+      }
+      language = "json";
+    } else if (isXml) {
+      bodyContent =
+        typeof response.body === "string"
+          ? response.body
+          : String(response.body);
+      language = "xml";
+    } else if (isHtml) {
+      bodyContent =
+        typeof response.body === "string"
+          ? response.body
+          : String(response.body);
+      language = "html";
+    } else {
+      bodyContent =
+        typeof response.body === "string"
+          ? response.body
+          : JSON.stringify(response.body, null, 2);
+      language = "text";
+    }
+  } catch (err) {
+    bodyContent = String(response.body);
+    language = "text";
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <Badge
+              variant="outline"
+              className={`${getStatusColor(
+                response.status
+              )} font-mono text-sm px-3 py-1`}
+            >
+              {response.status} {response.statusText}
+            </Badge>
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span className="font-mono">
+                {formatResponseTime(response.responseTime)}
+              </span>
+            </div>
+          </div>
+          <ResponseFormatter
+            response={response}
+            format={format}
+            onFormatChange={setFormat}
+          />
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {/* Response Headers */}
+        <Collapsible open={headersOpen} onOpenChange={setHeadersOpen}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="w-full justify-start">
+              Headers ({Object.keys(response.headers).length})
+            </Button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="pt-2">
-            {Object.keys(response.headers).length > 0 ? (
-              <div className="bg-muted rounded p-3 space-y-1">
+          <CollapsibleContent className="mt-2">
+            <div className="rounded-md border bg-muted/50 p-4">
+              <div className="space-y-2">
                 {Object.entries(response.headers).map(([key, value]) => (
-                  <div key={key} className="text-sm font-mono flex gap-2">
-                    <span className="text-muted-foreground">{key}:</span>
-                    <span className="break-all">{value}</span>
+                  <div key={key} className="flex gap-2 text-sm">
+                    <span className="font-mono font-medium text-foreground min-w-[200px]">
+                      {key}:
+                    </span>
+                    <span className="font-mono text-muted-foreground break-all">
+                      {value}
+                    </span>
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="text-sm text-muted-foreground italic p-2">
-                No headers
-              </div>
-            )}
+            </div>
           </CollapsibleContent>
         </Collapsible>
 
         <Separator />
 
         {/* Response Body */}
-        <div className="space-y-2">
-          <span className="text-sm font-medium">Body</span>
-          {formattedBody ? (
-            <div className="rounded overflow-hidden border">
-              <SyntaxHighlighter
-                language={language}
-                style={vscDarkPlus}
-                customStyle={{
-                  margin: 0,
-                  padding: "1rem",
-                  fontSize: "0.875rem",
-                  maxHeight: "500px",
-                  overflow: "auto",
-                }}
-                showLineNumbers={language === "json" || language === "xml"}
-              >
-                {formattedBody}
-              </SyntaxHighlighter>
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground italic p-4 border rounded">
-              No response body
-            </div>
-          )}
+        <div>
+          <h3 className="text-sm font-medium mb-3">Response Body</h3>
+          <div className="rounded-md overflow-hidden border">
+            {bodyContent ? (
+              <React.Suspense fallback={<ResponseBodySkeleton />}>
+                <MonacoEditor
+                  height="auto"
+                  language={language}
+                  value={bodyContent}
+                  theme="vs-dark"
+                  options={{
+                    readOnly: true,
+                    minimap: { enabled: false },
+                    scrollBeyondLastLine: false,
+                    fontSize: 14,
+                    lineNumbers: "on",
+                    wordWrap: "on",
+                    automaticLayout: true,
+                    scrollbar: {
+                      vertical: "hidden",
+                      horizontal: "hidden",
+                      useShadows: false,
+                      alwaysConsumeMouseWheel: false,
+                    },
+                    overviewRulerLanes: 0,
+                    hideCursorInOverviewRuler: true,
+                    overviewRulerBorder: false,
+                    folding: true,
+                    renderLineHighlight: "none",
+                    contextmenu: false,
+                    padding: { top: 12, bottom: 12 },
+                    lineHeight: 20,
+                    fixedOverflowWidgets: true,
+                  }}
+                  onMount={(editor) => {
+                    // Auto-size the editor to fit content
+                    const updateHeight = () => {
+                      const contentHeight = editor.getContentHeight();
+                      const container = editor.getContainerDomNode();
+                      if (container) {
+                        container.style.height = `${contentHeight}px`;
+                      }
+                      editor.layout();
+                    };
+
+                    // Update height after content is loaded
+                    setTimeout(updateHeight, 100);
+
+                    // Update on content changes
+                    editor.onDidContentSizeChange(updateHeight);
+                  }}
+                />
+              </React.Suspense>
+            ) : (
+              <div className="p-4 text-sm text-muted-foreground">
+                No response body
+              </div>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>
   );
-}
+});

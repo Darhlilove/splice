@@ -122,8 +122,27 @@ export async function executeRequest(
       authentication
     );
 
+    // Log request config for debugging
+    console.log("[Request Executor] Request config:", {
+      url: requestConfig.url,
+      method: requestConfig.method,
+      headers: requestConfig.headers,
+      hasBody: !!requestConfig.body,
+      bodyType: typeof requestConfig.body,
+    });
+
     // Record start time for duration measurement
     const startTime = Date.now();
+
+    // Prepare proxy payload
+    const proxyPayload = {
+      url: requestConfig.url,
+      method: requestConfig.method,
+      headers: requestConfig.headers,
+      body: requestConfig.body,
+    };
+
+    console.log("[Request Executor] Sending to proxy:", proxyPayload);
 
     // Call the proxy endpoint
     const proxyResponse = await fetch("/api/proxy", {
@@ -131,12 +150,7 @@ export async function executeRequest(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        url: requestConfig.url,
-        method: requestConfig.method,
-        headers: requestConfig.headers,
-        body: requestConfig.body,
-      }),
+      body: JSON.stringify(proxyPayload),
     });
 
     // Calculate duration
@@ -154,16 +168,29 @@ export async function executeRequest(
     }
 
     // Extract response data from proxy response
+    const responseDuration = proxyData.duration || duration;
     const responseData: ResponseData = {
       status: proxyData.status,
       statusText: proxyData.statusText,
       headers: proxyData.headers,
       body: proxyData.body,
-      duration: proxyData.duration || duration,
+      duration: responseDuration,
+      responseTime: responseDuration, // Alias for compatibility with APIResponse
       timestamp: proxyData.timestamp
         ? new Date(proxyData.timestamp)
         : new Date(),
+      contentType:
+        proxyData.headers?.["content-type"] ||
+        proxyData.headers?.["Content-Type"] ||
+        "text/plain",
     };
+
+    console.log("[Request Executor] Response data created:", {
+      status: responseData.status,
+      bodyType: typeof responseData.body,
+      body: responseData.body,
+      contentType: responseData.contentType,
+    });
 
     return {
       success: true,
@@ -210,7 +237,7 @@ export async function executeRequestWithState(
   setResponse: (response: ResponseData | null) => void,
   setValidationErrors: (errors: ValidationError[]) => void,
   onError?: (error: string) => void,
-  onSuccess?: () => void
+  onSuccess?: (response: ResponseData) => void
 ): Promise<void> {
   // Set loading state
   setIsExecuting(true);
@@ -232,9 +259,9 @@ export async function executeRequestWithState(
       // Update response state
       setResponse(result.response);
 
-      // Call success callback if provided
+      // Call success callback if provided with the response
       if (onSuccess) {
-        onSuccess();
+        onSuccess(result.response);
       }
     } else {
       // Handle validation errors

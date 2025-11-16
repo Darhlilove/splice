@@ -3,9 +3,31 @@
  */
 
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { ResponseViewer } from "@/components/ResponseViewer";
 import type { ResponseData } from "@/types/request-builder";
+
+// Mock next/dynamic to avoid lazy loading issues in tests
+vi.mock("next/dynamic", () => ({
+  default: (fn: any, options?: any) => {
+    const Component = fn().then((mod: any) => mod.default || mod);
+    return (props: any) => {
+      const [LoadedComponent, setLoadedComponent] = React.useState<any>(null);
+
+      React.useEffect(() => {
+        Component.then((comp: any) => setLoadedComponent(() => comp));
+      }, []);
+
+      if (!LoadedComponent) {
+        return options?.loading ? options.loading() : null;
+      }
+
+      return <LoadedComponent {...props} />;
+    };
+  },
+}));
+
+import * as React from "react";
 
 describe("ResponseViewer", () => {
   beforeEach(() => {
@@ -27,7 +49,9 @@ describe("ResponseViewer", () => {
         headers: {},
         body: { message: "Success" },
         duration: 150,
+        responseTime: 150,
         timestamp: new Date(),
+        contentType: "application/json",
       };
 
       render(<ResponseViewer response={response} />);
@@ -42,7 +66,9 @@ describe("ResponseViewer", () => {
         headers: {},
         body: { error: "Resource not found" },
         duration: 100,
+        responseTime: 100,
         timestamp: new Date(),
+        contentType: "application/json",
       };
 
       render(<ResponseViewer response={response} />);
@@ -57,7 +83,9 @@ describe("ResponseViewer", () => {
         headers: {},
         body: { error: "Server error" },
         duration: 200,
+        responseTime: 200,
         timestamp: new Date(),
+        contentType: "application/json",
       };
 
       render(<ResponseViewer response={response} />);
@@ -74,7 +102,9 @@ describe("ResponseViewer", () => {
         headers: {},
         body: {},
         duration: 250,
+        responseTime: 250,
         timestamp: new Date(),
+        contentType: "application/json",
       };
 
       render(<ResponseViewer response={response} />);
@@ -95,13 +125,15 @@ describe("ResponseViewer", () => {
         },
         body: {},
         duration: 100,
+        responseTime: 100,
         timestamp: new Date(),
+        contentType: "application/json",
       };
 
       render(<ResponseViewer response={response} />);
 
-      expect(screen.getByText("Headers")).toBeInTheDocument();
-      expect(screen.getByText("3")).toBeInTheDocument();
+      // Use regex to match text that might be split across elements
+      expect(screen.getByText(/Headers \(3\)/i)).toBeInTheDocument();
     });
 
     test("should show no headers message when headers are empty", () => {
@@ -111,60 +143,77 @@ describe("ResponseViewer", () => {
         headers: {},
         body: {},
         duration: 100,
+        responseTime: 100,
         timestamp: new Date(),
+        contentType: "application/json",
       };
 
       render(<ResponseViewer response={response} />);
 
-      expect(screen.getByText("Headers")).toBeInTheDocument();
-      expect(screen.getByText("0")).toBeInTheDocument();
+      // Use regex to match text that might be split across elements
+      expect(screen.getByText(/Headers \(0\)/i)).toBeInTheDocument();
     });
   });
 
   describe("Response Body", () => {
-    test("should display JSON response body", () => {
+    test("should display JSON response body", async () => {
       const response: ResponseData = {
         status: 200,
         statusText: "OK",
         headers: { "content-type": "application/json" },
         body: { name: "John Doe", email: "john@example.com" },
         duration: 100,
+        responseTime: 100,
         timestamp: new Date(),
+        contentType: "application/json",
       };
 
       render(<ResponseViewer response={response} />);
 
-      expect(screen.getByText("Body")).toBeInTheDocument();
+      // Wait for lazy-loaded component or check for Response Body heading
+      await waitFor(() => {
+        expect(screen.getByText("Response Body")).toBeInTheDocument();
+      });
     });
 
-    test("should display string response body", () => {
+    test("should display string response body", async () => {
       const response: ResponseData = {
         status: 200,
         statusText: "OK",
         headers: { "content-type": "text/plain" },
         body: "Plain text response",
         duration: 100,
+        responseTime: 100,
         timestamp: new Date(),
+        contentType: "text/plain",
       };
 
       render(<ResponseViewer response={response} />);
 
-      expect(screen.getByText("Body")).toBeInTheDocument();
+      // Wait for lazy-loaded component or check for Response Body heading
+      await waitFor(() => {
+        expect(screen.getByText("Response Body")).toBeInTheDocument();
+      });
     });
 
-    test("should show no body message when body is empty", () => {
+    test("should show response body section even when body is empty", async () => {
       const response: ResponseData = {
         status: 204,
         statusText: "No Content",
         headers: {},
         body: null,
         duration: 50,
+        responseTime: 50,
         timestamp: new Date(),
+        contentType: "",
       };
 
       render(<ResponseViewer response={response} />);
 
-      expect(screen.getByText("No response body")).toBeInTheDocument();
+      // Check for Response Body heading (body section is always shown)
+      await waitFor(() => {
+        expect(screen.getByText("Response Body")).toBeInTheDocument();
+      });
     });
   });
 
@@ -176,7 +225,9 @@ describe("ResponseViewer", () => {
         headers: {},
         body: { data: "test" },
         duration: 100,
+        responseTime: 100,
         timestamp: new Date(),
+        contentType: "application/json",
       };
 
       render(<ResponseViewer response={response} />);
@@ -191,7 +242,9 @@ describe("ResponseViewer", () => {
         headers: {},
         body: { data: "test" },
         duration: 100,
+        responseTime: 100,
         timestamp: new Date(),
+        contentType: "application/json",
       };
 
       render(<ResponseViewer response={response} />);
@@ -199,19 +252,33 @@ describe("ResponseViewer", () => {
       expect(screen.getByText("Download")).toBeInTheDocument();
     });
 
-    test("should render pretty/raw toggle for JSON responses", () => {
+    test("should render pretty/minify toggle for JSON responses", async () => {
       const response: ResponseData = {
         status: 200,
         statusText: "OK",
         headers: { "content-type": "application/json" },
         body: { data: "test" },
         duration: 100,
+        responseTime: 100,
         timestamp: new Date(),
+        contentType: "application/json",
       };
 
       render(<ResponseViewer response={response} />);
 
-      expect(screen.getByText("Raw")).toBeInTheDocument();
+      // Wait for format buttons to appear (Pretty and Minify)
+      await waitFor(
+        () => {
+          expect(
+            screen.getByRole("button", { name: /pretty/i })
+          ).toBeInTheDocument();
+        },
+        { timeout: 3000 }
+      );
+
+      expect(
+        screen.getByRole("button", { name: /minify/i })
+      ).toBeInTheDocument();
     });
   });
 });
