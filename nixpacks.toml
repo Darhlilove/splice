@@ -1,15 +1,16 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "pnpm"]
+nixPkgs = ["nodejs_20", "pnpm", "openjdk11"]
 
 [phases.install]
 cmds = [
-  "pnpm install --frozen-lockfile",
-  "pnpm add -g @stoplight/prism-cli",
-  "pnpm add -g @openapitools/openapi-generator-cli"
+  "pnpm install --frozen-lockfile"
 ]
 
 [phases.build]
-cmds = ["pnpm build"]
+cmds = [
+  "pnpm build",
+  "pnpm add --filter @splice/openapi @stoplight/prism-cli @openapitools/openapi-generator-cli"
+]
 
 [start]
 cmd = "cd apps/web && pnpm start"
