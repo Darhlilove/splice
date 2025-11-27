@@ -77,6 +77,7 @@ function ApiExplorerContent() {
       endpoint={selectedEndpoint}
       allSchemas={spec.schemas}
       baseUrl={baseUrl}
+      securitySchemes={spec.securitySchemes}
     />
   ) : (
     <Card className="h-full flex items-center justify-center">

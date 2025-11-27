@@ -93,7 +93,9 @@ export async function executeRequest(
   parameters: Record<string, ParameterValue>,
   requestBody: string | Record<string, unknown> | undefined,
   contentType: string,
-  authentication: AuthConfig
+  authentication: AuthConfig,
+  useMock?: boolean,
+  mockServerUrl?: string
 ): Promise<ExecuteRequestResult> {
   // Validate all inputs first
   const validationErrors = validateInputs(
@@ -140,6 +142,8 @@ export async function executeRequest(
       method: requestConfig.method,
       headers: requestConfig.headers,
       body: requestConfig.body,
+      useMock,
+      mockServerUrl,
     };
 
     console.log("[Request Executor] Sending to proxy:", proxyPayload);
@@ -237,7 +241,9 @@ export async function executeRequestWithState(
   setResponse: (response: ResponseData | null) => void,
   setValidationErrors: (errors: ValidationError[]) => void,
   onError?: (error: string) => void,
-  onSuccess?: (response: ResponseData) => void
+  onSuccess?: (response: ResponseData) => void,
+  useMock?: boolean,
+  mockServerUrl?: string
 ): Promise<void> {
   // Set loading state
   setIsExecuting(true);
@@ -252,7 +258,9 @@ export async function executeRequestWithState(
       parameters,
       requestBody,
       contentType,
-      authentication
+      authentication,
+      useMock,
+      mockServerUrl
     );
 
     if (result.success && result.response) {

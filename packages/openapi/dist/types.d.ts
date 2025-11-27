@@ -50,6 +50,7 @@ export interface OpenAPIOperation {
     parameters?: OpenAPIParameter[];
     requestBody?: OpenAPIRequestBody;
     responses?: Record<string, OpenAPIResponse>;
+    security?: Record<string, string[]>[];
 }
 export interface OpenAPIPathItem {
     get?: OpenAPIOperation;
@@ -72,13 +73,39 @@ export interface OpenAPISpec {
     paths?: Record<string, OpenAPIPathItem>;
     components?: {
         schemas?: Record<string, unknown>;
+        securitySchemes?: Record<string, unknown>;
     };
     definitions?: Record<string, unknown>;
+    securityDefinitions?: Record<string, unknown>;
+    security?: Array<Record<string, string[]>>;
 }
 export interface ParsedSpec {
     info: APIInfo;
     endpoints: Endpoint[];
     schemas: Record<string, SchemaObject>;
+    securitySchemes?: Record<string, SecurityScheme>;
+}
+export interface SecurityScheme {
+    type: "apiKey" | "http" | "oauth2" | "openIdConnect";
+    description?: string;
+    name?: string;
+    in?: "query" | "header" | "cookie";
+    scheme?: string;
+    bearerFormat?: string;
+    flows?: OAuthFlows;
+    openIdConnectUrl?: string;
+}
+export interface OAuthFlows {
+    implicit?: OAuthFlow;
+    password?: OAuthFlow;
+    clientCredentials?: OAuthFlow;
+    authorizationCode?: OAuthFlow;
+}
+export interface OAuthFlow {
+    authorizationUrl?: string;
+    tokenUrl?: string;
+    refreshUrl?: string;
+    scopes: Record<string, string>;
 }
 export interface APIInfo {
     title: string;
@@ -112,6 +139,7 @@ export interface Endpoint {
     requestBody?: RequestBody;
     responses: Record<string, Response>;
     tags?: string[];
+    security?: Record<string, string[]>[];
 }
 export interface Parameter {
     name: string;

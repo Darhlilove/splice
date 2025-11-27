@@ -19,10 +19,11 @@ export function generateSpecId() {
  * @param metadata - Optional metadata about the spec
  * @returns The spec ID
  */
-export function saveSpec(specId, spec, metadata) {
+export function saveSpec(specId, spec, metadata, originalSpec) {
     console.log(`[Store] Saving spec with ID: ${specId}`);
     specStore.set(specId, {
         spec,
+        originalSpec,
         metadata: Object.assign(Object.assign({}, metadata), { uploadedAt: new Date() }),
     });
     console.log(`[Store] Store size after save: ${specStore.size}`);

@@ -6,7 +6,10 @@ import type {
   Endpoint,
   SchemaObject,
   HTTPMethod,
+  SecurityScheme,
 } from "@/packages/openapi/src/types";
+
+export type { SecurityScheme };
 
 // Parameter value types
 export type ParameterValue = string | number | boolean | string[] | null;
@@ -77,30 +80,4 @@ export interface RequestBuilderState {
   response: ResponseData | null;
   isExecuting: boolean;
   validationErrors: ValidationError[];
-}
-
-// Security scheme types (from OpenAPI spec)
-export interface SecurityScheme {
-  type: "apiKey" | "http" | "oauth2" | "openIdConnect";
-  name?: string; // For apiKey
-  in?: "query" | "header" | "cookie"; // For apiKey
-  scheme?: string; // For http (e.g., "bearer", "basic")
-  bearerFormat?: string; // For http bearer
-  flows?: OAuthFlows; // For oauth2
-  openIdConnectUrl?: string; // For openIdConnect
-  description?: string;
-}
-
-export interface OAuthFlows {
-  implicit?: OAuthFlow;
-  password?: OAuthFlow;
-  clientCredentials?: OAuthFlow;
-  authorizationCode?: OAuthFlow;
-}
-
-export interface OAuthFlow {
-  authorizationUrl?: string;
-  tokenUrl?: string;
-  refreshUrl?: string;
-  scopes: Record<string, string>;
 }

@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     const specId = generateSpecId();
     saveSpec(specId, parsedSpec, {
       source: url,
-    });
+    }, parsedSpec.originalSpec);
 
     // Return the parsed spec with spec ID
     return NextResponse.json({

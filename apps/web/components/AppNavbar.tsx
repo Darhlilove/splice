@@ -4,6 +4,17 @@ import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { SettingsDialog } from "@/components/SettingsDialog";
+import { ConnectedSpecSelector } from "@/components/SpecSelector";
+import { MockServerStatus } from "@/components/MockServerStatus";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Icon } from "@iconify/react";
 
 export function AppNavbar() {
   const pathname = usePathname();
@@ -16,56 +27,82 @@ export function AppNavbar() {
   }, []);
 
   const navItems = [
-    { name: "Upload", href: "/upload", icon: "📤" },
-    { name: "Explorer", href: "/explorer", icon: "🔍" },
-    { name: "Mock", href: "/mock", icon: "🎭" },
-    { name: "SDK", href: "/sdk-generator", icon: "⚡" },
+    { name: "Upload", href: "/upload", icon: "lucide:upload" },
+    { name: "Explorer", href: "/explorer", icon: "lucide:search" },
+    { name: "Mock", href: "/mock", icon: "lucide:server" },
+    { name: "SDK", href: "/sdk-generator", icon: "lucide:code" },
   ];
 
   return (
-    <nav className="border-b border-border bg-background/70 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-        <NextLink
-          href="/"
-          className="font-logo font-bold text-2xl no-underline"
-        >
-          <span className="bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-            Splice
-          </span>
-        </NextLink>
-        <div className="flex items-center gap-2">
-          <div className="hidden sm:flex gap-2">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <NextLink
-                  key={item.href}
-                  href={item.href}
-                  className="no-underline"
+    <nav className="border-b border-border bg-background/70 backdrop-blur-md sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
+        {/* Left: Logo */}
+        <div className="flex items-center">
+          <NextLink
+            href="/"
+            className="font-logo font-bold text-xl sm:text-2xl no-underline"
+          >
+            <span className="bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+              Splice
+            </span>
+          </NextLink>
+        </div>
+
+        {/* Right: Status components, Navigation Menu, Settings, Theme */}
+        <div className="flex items-center gap-1 sm:gap-2">
+          {/* Spec Selector - Requirement 6.1 */}
+          {mounted && <ConnectedSpecSelector />}
+
+          {/* Mock Server Status - Requirement 4.5 */}
+          {mounted && <MockServerStatus />}
+
+          {/* Navigation Menu */}
+          {mounted && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-12 w-12 rounded-lg p-2"
+                  aria-label="Navigation menu"
                 >
-                  <button
-                    className={`
-                    px-4 py-2 rounded-full text-sm font-medium transition-colors
-                    flex items-center gap-2
-                    ${
-                      isActive
-                        ? "bg-blue-600 text-white hover:bg-blue-700"
-                        : "bg-transparent text-foreground hover:bg-blue-600/10 dark:hover:bg-blue-400/10"
-                    }
-                  `}
-                  >
-                    <span>{item.icon}</span>
-                    {item.name}
-                  </button>
-                </NextLink>
-              );
-            })}
-          </div>
+                  <Icon icon="lucide:menu" className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                {navItems.map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <DropdownMenuItem key={item.href} asChild>
+                      <NextLink
+                        href={item.href}
+                        className={`flex items-center gap-2 cursor-pointer ${isActive ? "bg-blue-600/10" : ""
+                          }`}
+                      >
+                        <Icon icon={item.icon} className="h-4 w-4" />
+                        <span>{item.name}</span>
+                        {isActive && (
+                          <Icon
+                            icon="lucide:check"
+                            className="h-4 w-4 ml-auto text-blue-600"
+                          />
+                        )}
+                      </NextLink>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          {/* Settings */}
+          {mounted && <SettingsDialog />}
+
           {/* Theme Switcher */}
           {mounted && (
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="p-2 rounded-full hover:bg-blue-600/10 dark:hover:bg-blue-400/10 transition-colors"
+              className="h-12 w-12 flex items-center justify-center rounded-lg p-2 hover:bg-blue-600/10 dark:hover:bg-blue-400/10 transition-colors"
               aria-label="Toggle theme"
             >
               {theme === "dark" ? (

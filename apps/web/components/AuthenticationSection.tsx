@@ -43,8 +43,22 @@ function detectSecurityScheme(
   endpoint: Endpoint,
   securitySchemes?: Record<string, SecurityScheme>
 ): SecurityScheme | null {
-  // For now, we'll check if securitySchemes exist and return the first one
-  // In a full implementation, we'd parse endpoint.security array
+  // Check if endpoint has specific security requirements
+  if (endpoint.security && endpoint.security.length > 0) {
+    // Get the first security requirement object (e.g., { "api_key": [] })
+    const securityRequirement = endpoint.security[0];
+    const schemeNames = Object.keys(securityRequirement);
+
+    if (schemeNames.length > 0) {
+      const schemeName = schemeNames[0];
+      // Return the matching scheme definition
+      return securitySchemes?.[schemeName] || null;
+    }
+  }
+
+  // Fallback: Check if securitySchemes exist and return the first one
+  // This handles cases where security might be defined globally but not on the endpoint
+  // (Note: Ideally we should pass global security down to the endpoint)
   if (!securitySchemes || Object.keys(securitySchemes).length === 0) {
     return null;
   }

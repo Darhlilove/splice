@@ -8,5 +8,7 @@ import type { ParsedSpec } from "./types.js";
  * @returns Parsed specification with structured data
  * @throws ParserError if parsing fails
  */
-export declare function parseOpenAPISpec(source: string): Promise<ParsedSpec>;
+export declare function parseOpenAPISpec(source: string): Promise<ParsedSpec & {
+    originalSpec?: any;
+}>;
 //# sourceMappingURL=parser.d.ts.map

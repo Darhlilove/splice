@@ -10,20 +10,46 @@ import type { ResponseData } from "@/types/request-builder";
 // Mock next/dynamic to avoid lazy loading issues in tests
 vi.mock("next/dynamic", () => ({
   default: (fn: any, options?: any) => {
-    const Component = fn().then((mod: any) => mod.default || mod);
-    return (props: any) => {
-      const [LoadedComponent, setLoadedComponent] = React.useState<any>(null);
+    // Return a component that immediately tries to load
+    const MockComponent = (props: any) => {
+      const [Component, setComponent] = React.useState<any>(null);
+      const [error, setError] = React.useState<any>(null);
 
       React.useEffect(() => {
-        Component.then((comp: any) => setLoadedComponent(() => comp));
+        let mounted = true;
+
+        // Call fn and handle the promise
+        Promise.resolve()
+          .then(() => fn())
+          .then((mod: any) => {
+            if (mounted) {
+              setComponent(() => mod.default || mod);
+            }
+          })
+          .catch((err: any) => {
+            if (mounted) {
+              setError(err);
+              console.error("Failed to load dynamic component in test:", err);
+            }
+          });
+
+        return () => {
+          mounted = false;
+        };
       }, []);
 
-      if (!LoadedComponent) {
+      if (error) {
+        return null;
+      }
+
+      if (!Component) {
         return options?.loading ? options.loading() : null;
       }
 
-      return <LoadedComponent {...props} />;
+      return <Component {...props} />;
     };
+
+    return MockComponent;
   },
 }));
 
@@ -39,6 +65,11 @@ describe("ResponseViewer", () => {
       writable: true,
       configurable: true,
     });
+
+    // Suppress unhandled rejections from next/dynamic mock
+    window.onunhandledrejection = (e) => {
+      e.preventDefault();
+    };
   });
 
   describe("Status Code Display", () => {

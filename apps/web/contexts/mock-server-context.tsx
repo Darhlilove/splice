@@ -3,67 +3,68 @@
 import * as React from "react";
 
 /**
- * Mock server configuration
+ * Mock server information returned from the API
  */
-export interface MockServerConfig {
-  enabled: boolean;
-  baseUrl: string;
+export interface MockServerInfo {
+  url: string;
+  port: number;
+  pid: number;
+  status: "running" | "stopped" | "starting" | "error";
+  startedAt: Date;
+  error?: string;
 }
 
 /**
- * Mock server context value
+ * Context value for mock server state
  */
 interface MockServerContextValue {
-  config: MockServerConfig;
-  setEnabled: (enabled: boolean) => void;
-  setBaseUrl: (baseUrl: string) => void;
-  toggleMockServer: () => void;
+  isMockMode: boolean;
+  setMockMode: (enabled: boolean) => void;
+  mockServerInfo: MockServerInfo | null;
+  setMockServerInfo: (info: MockServerInfo | null) => void;
 }
 
 /**
- * Mock server context
+ * Create the context with undefined default
  */
 const MockServerContext = React.createContext<
   MockServerContextValue | undefined
 >(undefined);
 
 /**
- * Props for MockServerProvider
+ * Props for the MockServerProvider component
  */
 interface MockServerProviderProps {
   children: React.ReactNode;
 }
 
 /**
- * Mock server provider component
- * Manages mock server state across the application
+ * MockServerProvider component
+ * Provides global state for mock server mode and server information
  */
 export function MockServerProvider({ children }: MockServerProviderProps) {
-  const [config, setConfig] = React.useState<MockServerConfig>({
-    enabled: false,
-    baseUrl: "http://localhost:4010", // Default Prism mock server port
-  });
+  const [isMockMode, setMockMode] = React.useState(false);
+  const [mockServerInfo, setMockServerInfo] =
+    React.useState<MockServerInfo | null>(null);
 
-  const setEnabled = React.useCallback((enabled: boolean) => {
-    setConfig((prev) => ({ ...prev, enabled }));
-  }, []);
-
-  const setBaseUrl = React.useCallback((baseUrl: string) => {
-    setConfig((prev) => ({ ...prev, baseUrl }));
-  }, []);
-
-  const toggleMockServer = React.useCallback(() => {
-    setConfig((prev) => ({ ...prev, enabled: !prev.enabled }));
-  }, []);
+  // Automatically disable mock mode if server stops
+  React.useEffect(() => {
+    if (
+      mockServerInfo &&
+      (mockServerInfo.status === "stopped" || mockServerInfo.status === "error")
+    ) {
+      setMockMode(false);
+    }
+  }, [mockServerInfo]);
 
   const value = React.useMemo(
     () => ({
-      config,
-      setEnabled,
-      setBaseUrl,
-      toggleMockServer,
+      isMockMode,
+      setMockMode,
+      mockServerInfo,
+      setMockServerInfo,
     }),
-    [config, setEnabled, setBaseUrl, toggleMockServer]
+    [isMockMode, mockServerInfo]
   );
 
   return (
@@ -74,12 +75,15 @@ export function MockServerProvider({ children }: MockServerProviderProps) {
 }
 
 /**
- * Hook to use mock server context
+ * Hook to access mock server context
+ * @throws Error if used outside of MockServerProvider
  */
-export function useMockServer() {
+export function useMockServer(): MockServerContextValue {
   const context = React.useContext(MockServerContext);
+
   if (context === undefined) {
     throw new Error("useMockServer must be used within a MockServerProvider");
   }
+
   return context;
 }

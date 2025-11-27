@@ -1,8 +1,17 @@
 "use client";
 
+import { useEffect } from "react";
 import { UploadForm } from "@/components/UploadForm";
+import { useWorkflow } from "@/contexts/workflow-context";
 
 export default function UploadPage() {
+  const { setCurrentStep } = useWorkflow();
+
+  // Set current step to upload when page loads
+  useEffect(() => {
+    setCurrentStep("upload");
+  }, [setCurrentStep]);
+
   const handleSubmit = (data: {
     mode: "file" | "url";
     file?: File;

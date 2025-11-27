@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,9 +11,11 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { QuickDemo } from "@/components/QuickDemo";
 import Link from "next/link";
 
 export default function Home() {
+  const [showDemo, setShowDemo] = React.useState(false);
   const features = [
     {
       title: "Upload Spec",
@@ -74,11 +77,14 @@ export default function Home() {
               Get Started →
             </Button>
           </Link>
-          <Link href="/explorer">
-            <Button size="lg" variant="outline" className="text-lg">
-              View Demo
-            </Button>
-          </Link>
+          <Button
+            size="lg"
+            variant="outline"
+            className="text-lg"
+            onClick={() => setShowDemo(true)}
+          >
+            Quick Demo
+          </Button>
         </div>
       </div>
 
@@ -103,6 +109,19 @@ export default function Home() {
           </Link>
         ))}
       </div>
+
+      {/* Quick Demo Section */}
+      {showDemo && (
+        <div className="w-full max-w-6xl mb-20">
+          <QuickDemo
+            onExit={() => setShowDemo(false)}
+            onComplete={() => {
+              // Keep demo visible after completion
+              // User can manually close it
+            }}
+          />
+        </div>
+      )}
 
       <Separator className="my-12 max-w-6xl" />
 

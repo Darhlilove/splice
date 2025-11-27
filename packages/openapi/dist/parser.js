@@ -23,11 +23,18 @@ export async function parseOpenAPISpec(source) {
         // Extract endpoints using both versions:
         // - Use dereferenced for requestBody/response content extraction
         // - But preserve $refs in the actual schema objects
+        // Extract endpoints using both versions:
+        // - Use dereferenced for requestBody/response content extraction
+        // - But preserve $refs in the actual schema objects
         const endpoints = extractEndpointsHybrid(bundledApi, dereferencedApi);
+        // Extract security schemes
+        const securitySchemes = extractSecuritySchemes(bundledApi);
         return {
             info,
             endpoints,
             schemas,
+            securitySchemes,
+            originalSpec: bundledApi, // Return bundled for Prism
         };
     }
     catch (error) {
@@ -83,7 +90,7 @@ function extractInfo(api) {
  * Uses bundled API for schema $refs and dereferenced API for requestBody/response content
  */
 function extractEndpointsHybrid(bundledApi, dereferencedApi) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
     const endpoints = [];
     if (!bundledApi.paths) {
         return endpoints;
@@ -125,6 +132,10 @@ function extractEndpointsHybrid(bundledApi, dereferencedApi) {
             // Extract tags
             if (operation.tags && Array.isArray(operation.tags)) {
                 endpoint.tags = operation.tags;
+            }
+            // Extract security
+            if (operation.security && Array.isArray(operation.security)) {
+                endpoint.security = operation.security;
             }
             // Extract parameters (use bundled - parameters usually don't have complex refs)
             if (operation.parameters && Array.isArray(operation.parameters)) {
@@ -168,6 +179,25 @@ function extractEndpointsHybrid(bundledApi, dereferencedApi) {
                     }
                 }
             }
+            else if (dereferencedOperation === null || dereferencedOperation === void 0 ? void 0 : dereferencedOperation.parameters) {
+                // Fallback for Swagger 2.0: Check for 'body' parameter
+                const bodyParam = dereferencedOperation.parameters.find((p) => p.in === "body");
+                if (bodyParam && bodyParam.schema) {
+                    // Find the bundled version of this parameter to preserve $refs
+                    const bundledBodyParam = (_e = operation.parameters) === null || _e === void 0 ? void 0 : _e.find((p) => p.in === "body" || p.name === bodyParam.name);
+                    const schema = (bundledBodyParam === null || bundledBodyParam === void 0 ? void 0 : bundledBodyParam.schema) ||
+                        bodyParam.schema;
+                    endpoint.requestBody = {
+                        required: bodyParam.required || false,
+                        description: bodyParam.description,
+                        content: {
+                            "application/json": {
+                                schema: schema,
+                            },
+                        },
+                    };
+                }
+            }
             // Extract responses - use dereferenced for content but bundled for schemas
             if (dereferencedOperation === null || dereferencedOperation === void 0 ? void 0 : dereferencedOperation.responses) {
                 for (const [statusCode, responseObj] of Object.entries(dereferencedOperation.responses)) {
@@ -179,7 +209,7 @@ function extractEndpointsHybrid(bundledApi, dereferencedApi) {
                         response.content = {};
                         for (const [contentType, mediaTypeObj] of Object.entries(responseObj.content)) {
                             // Try to get the bundled version's schema to preserve $refs
-                            const bundledSchema = (_h = (_g = (_f = (_e = operation.responses) === null || _e === void 0 ? void 0 : _e[statusCode]) === null || _f === void 0 ? void 0 : _f.content) === null || _g === void 0 ? void 0 : _g[contentType]) === null || _h === void 0 ? void 0 : _h.schema;
+                            const bundledSchema = (_j = (_h = (_g = (_f = operation.responses) === null || _f === void 0 ? void 0 : _f[statusCode]) === null || _g === void 0 ? void 0 : _g.content) === null || _h === void 0 ? void 0 : _h[contentType]) === null || _j === void 0 ? void 0 : _j.schema;
                             response.content[contentType] = {
                                 schema: (bundledSchema ||
                                     mediaTypeObj.schema ||
@@ -189,7 +219,7 @@ function extractEndpointsHybrid(bundledApi, dereferencedApi) {
                     }
                     // Handle schema for Swagger 2.0
                     else if (responseObj.schema) {
-                        const bundledSchema = (_k = (_j = operation.responses) === null || _j === void 0 ? void 0 : _j[statusCode]) === null || _k === void 0 ? void 0 : _k.schema;
+                        const bundledSchema = (_l = (_k = operation.responses) === null || _k === void 0 ? void 0 : _k[statusCode]) === null || _l === void 0 ? void 0 : _l.schema;
                         response.content = {
                             "application/json": {
                                 schema: (bundledSchema || responseObj.schema),
@@ -339,6 +369,26 @@ function extractSchemas(api) {
         }
     }
     return schemas;
+}
+/**
+ * Extract security schemes from the specification
+ */
+function extractSecuritySchemes(api) {
+    var _a;
+    const schemes = {};
+    // OpenAPI 3.x
+    if ((_a = api.components) === null || _a === void 0 ? void 0 : _a.securitySchemes) {
+        Object.entries(api.components.securitySchemes).forEach(([key, scheme]) => {
+            schemes[key] = scheme;
+        });
+    }
+    // Swagger 2.0
+    else if (api.securityDefinitions) {
+        Object.entries(api.securityDefinitions).forEach(([key, scheme]) => {
+            schemes[key] = scheme;
+        });
+    }
+    return Object.keys(schemes).length > 0 ? schemes : undefined;
 }
 /**
  * Handle and categorize parser errors

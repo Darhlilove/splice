@@ -12,6 +12,7 @@ import type {
   Parameter,
   Response,
   OpenAPISpec,
+  SecurityScheme,
 } from "./types.js";
 import { ParserError } from "./types.js";
 import { removeCircularReferences } from "./utils.js";
@@ -22,7 +23,7 @@ import { removeCircularReferences } from "./utils.js";
  * @returns Parsed specification with structured data
  * @throws ParserError if parsing fails
  */
-export async function parseOpenAPISpec(source: string): Promise<ParsedSpec> {
+export async function parseOpenAPISpec(source: string): Promise<ParsedSpec & { originalSpec?: any }> {
   try {
     // Use bundle() to preserve internal $refs (especially in schemas)
     // This keeps references like {"$ref": "#/components/schemas/Pet"} intact
@@ -42,12 +43,20 @@ export async function parseOpenAPISpec(source: string): Promise<ParsedSpec> {
     // Extract endpoints using both versions:
     // - Use dereferenced for requestBody/response content extraction
     // - But preserve $refs in the actual schema objects
+    // Extract endpoints using both versions:
+    // - Use dereferenced for requestBody/response content extraction
+    // - But preserve $refs in the actual schema objects
     const endpoints = extractEndpointsHybrid(bundledApi, dereferencedApi);
+
+    // Extract security schemes
+    const securitySchemes = extractSecuritySchemes(bundledApi);
 
     return {
       info,
       endpoints,
       schemas,
+      securitySchemes,
+      originalSpec: bundledApi, // Return bundled for Prism
     };
   } catch (error) {
     throw handleParserError(error as Error, source);
@@ -162,6 +171,11 @@ function extractEndpointsHybrid(
         endpoint.tags = operation.tags;
       }
 
+      // Extract security
+      if (operation.security && Array.isArray(operation.security)) {
+        endpoint.security = operation.security;
+      }
+
       // Extract parameters (use bundled - parameters usually don't have complex refs)
       if (operation.parameters && Array.isArray(operation.parameters)) {
         endpoint.parameters = operation.parameters.map((param) => {
@@ -213,6 +227,32 @@ function extractEndpointsHybrid(
               };
             }
           }
+        }
+      } else if (dereferencedOperation?.parameters) {
+        // Fallback for Swagger 2.0: Check for 'body' parameter
+        const bodyParam = dereferencedOperation.parameters.find(
+          (p: any) => p.in === "body"
+        ) as any;
+
+        if (bodyParam && bodyParam.schema) {
+          // Find the bundled version of this parameter to preserve $refs
+          const bundledBodyParam = operation.parameters?.find(
+            (p: any) => p.in === "body" || p.name === bodyParam.name
+          ) as any;
+
+          const schema =
+            (bundledBodyParam?.schema as SchemaObject) ||
+            (bodyParam.schema as SchemaObject);
+
+          endpoint.requestBody = {
+            required: bodyParam.required || false,
+            description: bodyParam.description,
+            content: {
+              "application/json": {
+                schema: schema,
+              },
+            },
+          };
         }
       }
 
@@ -334,8 +374,7 @@ function extractEndpoints(api: OpenAPISpec): Endpoint[] {
         // Skip if requestBody is just a $ref (shouldn't happen with dereference, but just in case)
         if (rb.$ref) {
           console.warn(
-            `Unresolved requestBody $ref: ${
-              rb.$ref
+            `Unresolved requestBody $ref: ${rb.$ref
             } at ${method.toUpperCase()} ${path}`
           );
           continue;
@@ -427,6 +466,30 @@ function extractSchemas(api: OpenAPISpec): Record<string, SchemaObject> {
   }
 
   return schemas;
+}
+
+/**
+ * Extract security schemes from the specification
+ */
+function extractSecuritySchemes(
+  api: OpenAPISpec
+): Record<string, SecurityScheme> | undefined {
+  const schemes: Record<string, SecurityScheme> = {};
+
+  // OpenAPI 3.x
+  if (api.components?.securitySchemes) {
+    Object.entries(api.components.securitySchemes).forEach(([key, scheme]) => {
+      schemes[key] = scheme as SecurityScheme;
+    });
+  }
+  // Swagger 2.0
+  else if (api.securityDefinitions) {
+    Object.entries(api.securityDefinitions).forEach(([key, scheme]) => {
+      schemes[key] = scheme as SecurityScheme;
+    });
+  }
+
+  return Object.keys(schemes).length > 0 ? schemes : undefined;
 }
 
 /**

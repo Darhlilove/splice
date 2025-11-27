@@ -20,6 +20,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { executeRequestWithState } from "@/lib/request-executor";
 import { Loader2, Play, AlertCircle, RefreshCw, Server } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -65,12 +67,15 @@ export function RequestBuilder({
   securitySchemes,
 }: RequestBuilderProps) {
   // Mock server context
-  const { config: mockServerConfig } = useMockServer();
+  const { isMockMode, setMockMode, mockServerInfo } = useMockServer();
 
   // Determine the effective base URL (mock or real)
-  const effectiveBaseUrl = mockServerConfig.enabled
-    ? mockServerConfig.baseUrl
-    : baseUrl;
+  const effectiveBaseUrl =
+    isMockMode && mockServerInfo?.url ? mockServerInfo.url : baseUrl;
+
+  // Check if mock server is running
+  const isMockServerRunning =
+    mockServerInfo?.status === "running" && mockServerInfo?.url;
 
   // State for parameters
   const [parameters, setParameters] = React.useState<
@@ -295,7 +300,9 @@ export function RequestBuilder({
           description: "The API request completed successfully.",
           duration: 3000,
         });
-      }
+      },
+      isMockMode,
+      mockServerInfo?.url
     );
   }, [
     endpoint,
@@ -304,6 +311,8 @@ export function RequestBuilder({
     requestBody,
     contentType,
     authentication,
+    isMockMode,
+    mockServerInfo?.url,
   ]);
 
   /**
@@ -316,12 +325,16 @@ export function RequestBuilder({
   // Check if there are validation errors
   const hasValidationErrors = validationErrors.length > 0;
 
+  // Check if execution should be disabled
+  const isExecutionDisabled =
+    hasValidationErrors || isExecuting || (isMockMode && !isMockServerRunning);
+
   // Add keyboard shortcut for executing request (Ctrl/Cmd + Enter)
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
         event.preventDefault();
-        if (!hasValidationErrors && !isExecuting) {
+        if (!isExecutionDisabled) {
           handleExecuteRequest();
         }
       }
@@ -329,7 +342,7 @@ export function RequestBuilder({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [hasValidationErrors, isExecuting, handleExecuteRequest]);
+  }, [isExecutionDisabled, handleExecuteRequest]);
 
   // Focus on first error when validation fails
   React.useEffect(() => {
@@ -383,7 +396,7 @@ export function RequestBuilder({
                 {endpoint.method.toUpperCase()}
               </Badge>
               <code className="text-lg font-mono">{endpoint.path}</code>
-              {mockServerConfig.enabled && (
+              {isMockMode && mockServerInfo && (
                 <Badge
                   variant="outline"
                   className="bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20"
@@ -401,7 +414,7 @@ export function RequestBuilder({
                 {endpoint.description}
               </p>
             )}
-            {mockServerConfig.enabled && (
+            {isMockMode && mockServerInfo && (
               <div className="flex items-start gap-2 p-3 rounded-lg bg-purple-500/5 border border-purple-500/20">
                 <Server className="w-4 h-4 text-purple-700 dark:text-purple-400 mt-0.5 flex-shrink-0" />
                 <div className="text-sm">
@@ -411,7 +424,7 @@ export function RequestBuilder({
                   <p className="text-muted-foreground">
                     Requests will be sent to{" "}
                     <code className="text-xs bg-muted px-1 py-0.5 rounded">
-                      {mockServerConfig.baseUrl}
+                      {mockServerInfo.url}
                     </code>
                   </p>
                 </div>
@@ -419,6 +432,47 @@ export function RequestBuilder({
             )}
           </div>
         </CardHeader>
+      </Card>
+
+      {/* Mock Mode Toggle */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label
+                htmlFor="mock-mode-toggle"
+                className="text-sm font-medium cursor-pointer"
+              >
+                Use Mock Server
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {isMockServerRunning
+                  ? "Route requests to the mock server instead of the real API"
+                  : "Start the mock server to enable this option"}
+              </p>
+            </div>
+            <Switch
+              id="mock-mode-toggle"
+              checked={isMockMode}
+              onCheckedChange={setMockMode}
+              disabled={!isMockServerRunning}
+              aria-label="Toggle mock server mode"
+            />
+          </div>
+          {!isMockServerRunning && isMockMode && (
+            <div className="mt-3 flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+              <AlertCircle className="w-4 h-4 text-yellow-700 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+              <div className="text-sm">
+                <p className="font-medium text-yellow-700 dark:text-yellow-400">
+                  Mock Server Not Running
+                </p>
+                <p className="text-muted-foreground">
+                  The mock server is not running. Start it to use mock mode.
+                </p>
+              </div>
+            </div>
+          )}
+        </CardContent>
       </Card>
 
       {/* Parameter Form */}
@@ -482,6 +536,8 @@ export function RequestBuilder({
         body={requestBody}
         contentType={contentType}
         authentication={authentication}
+        isMockMode={isMockMode}
+        realBaseUrl={baseUrl}
       />
 
       {/* Preset Manager */}
@@ -592,7 +648,7 @@ export function RequestBuilder({
         <div className="space-y-2">
           <Button
             onClick={handleExecuteRequest}
-            disabled={hasValidationErrors || isExecuting}
+            disabled={isExecutionDisabled}
             size="lg"
             className="w-full"
             aria-label={

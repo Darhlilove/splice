@@ -6,10 +6,14 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test:parser": "tsx test-parser.ts"
+    "test:parser": "tsx test-parser.ts",
+    "test:sdk-generator": "tsx test-sdk-generator.ts"
   },
   "dependencies": {
-    "@apidevtools/swagger-parser": "^12.1.0"
+    "@apidevtools/swagger-parser": "^12.1.0",
+    "@openapitools/openapi-generator-cli": "^2.25.2",
+    "@types/archiver": "^7.0.0",
+    "archiver": "^7.0.1"
   },
   "devDependencies": {
     "tsx": "^4.20.6",

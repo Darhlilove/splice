@@ -18,10 +18,12 @@ import {
 import { useStoredSpec } from "@/hooks/use-stored-spec";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import type { HTTPMethod, SchemaObject } from "@splice/openapi";
 import { SchemaViewer } from "@/components/SchemaViewer";
+import { MockServerControls } from "@/components/MockServerControls";
+import { useWorkflow } from "@/contexts/workflow-context";
 
 const METHOD_COLORS: Record<HTTPMethod, string> = {
   get: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
@@ -41,10 +43,30 @@ function ExplorerContent() {
   const { spec, metadata, isLoading, hasSpec, allSpecs, switchSpec } =
     useStoredSpec(specId || undefined);
   const router = useRouter();
+  const { setCurrentStep, setCurrentSpec } = useWorkflow();
   const [selectedSchema, setSelectedSchema] = useState<string | null>(null);
   const [serversOpen, setServersOpen] = useState(true);
   const [endpointsOpen, setEndpointsOpen] = useState(true);
   const [schemasOpen, setSchemasOpen] = useState(true);
+
+  // Set current step to explore when page loads (Requirement 1.2)
+  useEffect(() => {
+    setCurrentStep("explore");
+  }, [setCurrentStep]);
+
+  // Update workflow context when spec is loaded (Requirement 1.2)
+  useEffect(() => {
+    if (spec && specId) {
+      setCurrentSpec(spec, {
+        id: specId,
+        name: spec.info.title,
+        version: spec.info.version,
+        uploadedAt: metadata?.uploadedAt
+          ? new Date(metadata.uploadedAt)
+          : new Date(),
+      });
+    }
+  }, [spec, specId, metadata, setCurrentSpec]);
 
   if (isLoading) {
     return (
@@ -159,6 +181,13 @@ function ExplorerContent() {
           </p>
         )}
       </div>
+
+      {/* Mock Server Controls */}
+      {specId && (
+        <div className="mb-6">
+          <MockServerControls specId={specId} spec={spec} />
+        </div>
+      )}
 
       {/* Servers */}
       {spec.info.servers && spec.info.servers.length > 0 && (

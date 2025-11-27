@@ -8,6 +8,10 @@ import { Icon } from "@iconify/react";
 import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { storeSpec, getAllStoredSpecs } from "@/lib/spec-storage";
+import { useSettings } from "@/contexts/settings-context";
+import { useMockServer } from "@/contexts/mock-server-context";
+import { useWorkflow } from "@/contexts/workflow-context";
+import { toast } from "sonner";
 
 type UploadMode = "file" | "url";
 
@@ -29,6 +33,9 @@ export function UploadForm({ onSubmit }: UploadFormProps) {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const { settings } = useSettings();
+  const { setMockServerInfo } = useMockServer();
+  const { setCurrentSpec } = useWorkflow();
 
   const validateFile = (file: File): string | null => {
     const validExtensions = [".json", ".yaml", ".yml"];
@@ -103,6 +110,60 @@ export function UploadForm({ onSubmit }: UploadFormProps) {
     setSelectedFiles(validFiles);
   };
 
+  const startMockServer = async (
+    specId: string,
+    spec: any,
+    retryCount = 0
+  ): Promise<boolean> => {
+    try {
+      const response = await fetch("/api/mock/start", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ specId, spec }),
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.serverInfo) {
+        setMockServerInfo(result.serverInfo);
+        toast.success("Mock server started", {
+          description: `Server running at ${result.serverInfo.url}`,
+          action: {
+            label: "Open",
+            onClick: () => window.open(result.serverInfo.url, "_blank"),
+          },
+        });
+        return true;
+      } else {
+        throw new Error(result.error || "Failed to start mock server");
+      }
+    } catch (error) {
+      console.error("Mock server auto-start error:", error);
+
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+
+      // Show error toast with retry option
+      if (retryCount < 2) {
+        toast.error("Mock server failed to start", {
+          description: errorMessage,
+          action: {
+            label: "Retry",
+            onClick: () => startMockServer(specId, spec, retryCount + 1),
+          },
+        });
+      } else {
+        toast.error("Mock server failed to start", {
+          description: errorMessage,
+        });
+      }
+
+      return false;
+    }
+  };
+
   const handleSubmit = async () => {
     if (mode === "file" && selectedFiles.length === 0) {
       setFileError("Please select at least one file");
@@ -145,10 +206,28 @@ export function UploadForm({ onSubmit }: UploadFormProps) {
 
         // Store all parsed specs
         let lastSpecId = null;
+        let lastSpec = null;
         for (const result of results) {
           if (result.specId && result.data) {
             storeSpec(result.specId, result.data, result.metadata);
             lastSpecId = result.specId;
+            lastSpec = result.data;
+          }
+        }
+
+        // Update workflow context with the last uploaded spec (Requirement 1.1)
+        if (lastSpecId && lastSpec) {
+          setCurrentSpec(lastSpec, {
+            id: lastSpecId,
+            name: lastSpec.info.title,
+            version: lastSpec.info.version,
+            uploadedAt: new Date(),
+          });
+
+          // Auto-start mock server if enabled
+          if (settings.autoStartMockServer) {
+            // Start mock server in background (don't wait for it)
+            startMockServer(lastSpecId, lastSpec);
           }
         }
 
@@ -177,6 +256,20 @@ export function UploadForm({ onSubmit }: UploadFormProps) {
         // Store parsed spec using the storage utility
         if (result.specId && result.data) {
           storeSpec(result.specId, result.data, result.metadata);
+
+          // Update workflow context with the uploaded spec (Requirement 1.1)
+          setCurrentSpec(result.data, {
+            id: result.specId,
+            name: result.data.info.title,
+            version: result.data.info.version,
+            uploadedAt: new Date(),
+          });
+
+          // Auto-start mock server if enabled
+          if (settings.autoStartMockServer) {
+            // Start mock server in background (don't wait for it)
+            startMockServer(result.specId, result.data);
+          }
         }
 
         // Navigate to explorer with specId in URL

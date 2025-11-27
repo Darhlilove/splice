@@ -45,12 +45,39 @@ function isValidProxyTarget(url: string): boolean {
 /**
  * POST /api/proxy
  * Proxies an HTTP request to the specified URL
+ * Supports routing to mock servers when useMock is enabled
  */
 export async function POST(request: NextRequest) {
+  // Parse request body outside try block so it's accessible in catch
+  let requestData:
+    | {
+        url: string;
+        method: string;
+        headers?: Record<string, string>;
+        body?: any;
+        useMock?: boolean;
+        mockServerUrl?: string;
+      }
+    | undefined;
+
   try {
-    // Parse request body
-    const body = await request.json();
-    const { url, method, headers, body: requestBody } = body;
+    requestData = await request.json();
+
+    if (!requestData) {
+      return NextResponse.json(
+        { error: "Invalid request body" },
+        { status: 400 }
+      );
+    }
+
+    const {
+      url,
+      method,
+      headers,
+      body: requestBody,
+      useMock,
+      mockServerUrl,
+    } = requestData;
 
     // Log incoming request for debugging
     console.log("[Proxy] Incoming request:", {
@@ -58,6 +85,8 @@ export async function POST(request: NextRequest) {
       method,
       hasHeaders: !!headers,
       hasBody: !!requestBody,
+      useMock,
+      mockServerUrl,
     });
 
     // Validate required fields
@@ -69,9 +98,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate URL
-    if (!isValidProxyTarget(url)) {
-      console.error("[Proxy] Invalid URL:", url);
+    // Determine target URL based on mock mode
+    let targetUrl = url;
+    if (useMock && mockServerUrl) {
+      // Extract the path and query from the original URL
+      try {
+        const originalUrl = new URL(url);
+        const mockUrl = new URL(mockServerUrl);
+
+        // Construct new URL with mock server base and original path/query
+        targetUrl = `${mockUrl.origin}${originalUrl.pathname}${originalUrl.search}`;
+
+        console.log("[Proxy] Routing to mock server:", {
+          original: url,
+          mock: targetUrl,
+        });
+      } catch (error) {
+        console.error("[Proxy] Failed to construct mock URL:", error);
+        return NextResponse.json(
+          {
+            error: "Invalid mock server URL",
+            message:
+              "Failed to route request to mock server. Please check the mock server URL.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validate URL (skip validation for localhost when using mock server)
+    if (!useMock && !isValidProxyTarget(targetUrl)) {
+      console.error("[Proxy] Invalid URL:", targetUrl);
       return NextResponse.json(
         {
           error:
@@ -86,7 +143,7 @@ export async function POST(request: NextRequest) {
 
     // Make the proxied request using axios
     const response = await axios({
-      url,
+      url: targetUrl,
       method: method.toUpperCase(),
       headers: headers || {},
       data: requestBody,
@@ -163,13 +220,20 @@ export async function POST(request: NextRequest) {
         axiosError.code === "ENOTFOUND" ||
         axiosError.code === "ECONNREFUSED"
       ) {
+        // Provide specific error message for mock server connection failures
+        const isMockServerError =
+          requestData?.useMock && requestData?.mockServerUrl;
+        const errorMessage = isMockServerError
+          ? "Failed to connect to the mock server. Please ensure the mock server is running and accessible."
+          : "Failed to connect to the target server. The server may be unreachable or the URL may be incorrect.";
+
         return NextResponse.json(
           {
             error: "Network error",
-            message:
-              "Failed to connect to the target server. The server may be unreachable or the URL may be incorrect.",
+            message: errorMessage,
             type: "network",
             details: axiosError.message,
+            ...(isMockServerError && { mockServerError: true }),
           },
           { status: 502 }
         );
@@ -177,13 +241,19 @@ export async function POST(request: NextRequest) {
 
       // Handle other network errors
       if (!axiosError.response) {
+        const isMockServerError =
+          requestData?.useMock && requestData?.mockServerUrl;
+        const errorMessage = isMockServerError
+          ? "Network request to mock server failed. Please verify the mock server is running."
+          : "Network request failed. Please check the URL and your internet connection.";
+
         return NextResponse.json(
           {
             error: "Network error",
-            message:
-              "Network request failed. Please check the URL and your internet connection.",
+            message: errorMessage,
             type: "network",
             details: axiosError.message,
+            ...(isMockServerError && { mockServerError: true }),
           },
           { status: 502 }
         );

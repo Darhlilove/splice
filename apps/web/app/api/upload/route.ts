@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       const savedId = saveSpec(specId, parsedSpec, {
         fileName: file.name,
         fileSize: file.size,
-      });
+      }, parsedSpec.originalSpec);
       console.log("Saved spec with ID:", savedId);
 
       // Return the parsed spec with spec ID

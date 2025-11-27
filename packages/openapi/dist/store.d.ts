@@ -5,6 +5,7 @@
 import type { ParsedSpec } from "./types.js";
 interface StoredSpec {
     spec: ParsedSpec;
+    originalSpec?: any;
     metadata: {
         fileName?: string;
         fileSize?: number;
@@ -27,7 +28,7 @@ export declare function saveSpec(specId: string, spec: ParsedSpec, metadata?: {
     fileName?: string;
     fileSize?: number;
     source?: string;
-}): string;
+}, originalSpec?: any): string;
 /**
  * Retrieve a parsed spec from the store
  * @param specId - The spec ID to retrieve

@@ -7,6 +7,7 @@ import type { ParsedSpec } from "./types.js";
 
 interface StoredSpec {
   spec: ParsedSpec;
+  originalSpec?: any; // Original OpenAPI spec for Prism
   metadata: {
     fileName?: string;
     fileSize?: number;
@@ -42,11 +43,13 @@ export function saveSpec(
     fileName?: string;
     fileSize?: number;
     source?: string;
-  }
+  },
+  originalSpec?: any
 ): string {
   console.log(`[Store] Saving spec with ID: ${specId}`);
   specStore.set(specId, {
     spec,
+    originalSpec,
     metadata: {
       ...metadata,
       uploadedAt: new Date(),

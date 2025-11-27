@@ -78,7 +78,7 @@ function validateValueAgainstSchema(
   const errors: ValidationError[] = [];
 
   // Skip validation for $ref (would need schema resolution)
-  if ("$ref" in schema && schema.$ref) {
+  if (typeof schema === "object" && schema !== null && "$ref" in schema && schema.$ref) {
     return errors;
   }
 
@@ -203,9 +203,8 @@ function validateValueAgainstSchema(
         ) {
           errors.push({
             field: fieldPath,
-            message: `Array must contain at least ${schema.minItems} item${
-              schema.minItems !== 1 ? "s" : ""
-            }`,
+            message: `Array must contain at least ${schema.minItems} item${schema.minItems !== 1 ? "s" : ""
+              }`,
             type: "min",
           });
         }
@@ -216,9 +215,8 @@ function validateValueAgainstSchema(
         ) {
           errors.push({
             field: fieldPath,
-            message: `Array must contain at most ${schema.maxItems} item${
-              schema.maxItems !== 1 ? "s" : ""
-            }`,
+            message: `Array must contain at most ${schema.maxItems} item${schema.maxItems !== 1 ? "s" : ""
+              }`,
             type: "max",
           });
         }

@@ -1,0 +1,462 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Petstore API",
+        "version": "1.0.0",
+        "description": "A sample API for managing pets in a petstore",
+        "contact": {
+            "name": "API Support",
+            "email": "support@petstore.example.com"
+        }
+    },
+    "servers": [
+        {
+            "url": "https://api.petstore.example.com/v1",
+            "description": "Production server"
+        },
+        {
+            "url": "https://staging.petstore.example.com/v1",
+            "description": "Staging server"
+        }
+    ],
+    "paths": {
+        "/pets": {
+            "get": {
+                "summary": "List all pets",
+                "operationId": "listPets",
+                "tags": [
+                    "pets"
+                ],
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "description": "How many items to return at one time (max 100)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "maximum": 100,
+                            "default": 20
+                        }
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "description": "Number of items to skip",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "default": 0
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A paged array of pets",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/Pet"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create a pet",
+                "operationId": "createPet",
+                "tags": [
+                    "pets"
+                ],
+                "requestBody": {
+                    "description": "Pet to add to the store",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/NewPet"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Pet created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Pet"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/pets/{petId}": {
+            "get": {
+                "summary": "Info for a specific pet",
+                "operationId": "getPetById",
+                "tags": [
+                    "pets"
+                ],
+                "parameters": [
+                    {
+                        "name": "petId",
+                        "in": "path",
+                        "required": true,
+                        "description": "The id of the pet to retrieve",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Expected response to a valid request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Pet"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Pet not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update a pet",
+                "operationId": "updatePet",
+                "tags": [
+                    "pets"
+                ],
+                "parameters": [
+                    {
+                        "name": "petId",
+                        "in": "path",
+                        "required": true,
+                        "description": "The id of the pet to update",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Updated pet information",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/NewPet"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Pet updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Pet"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Pet not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete a pet",
+                "operationId": "deletePet",
+                "tags": [
+                    "pets"
+                ],
+                "parameters": [
+                    {
+                        "name": "petId",
+                        "in": "path",
+                        "required": true,
+                        "description": "The id of the pet to delete",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Pet deleted successfully"
+                    },
+                    "404": {
+                        "description": "Pet not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/pets/{petId}/photos": {
+            "post": {
+                "summary": "Upload a pet photo",
+                "operationId": "uploadPetPhoto",
+                "tags": [
+                    "pets"
+                ],
+                "parameters": [
+                    {
+                        "name": "petId",
+                        "in": "path",
+                        "required": true,
+                        "description": "The id of the pet",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "photo": {
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Photo uploaded successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "photoUrl": {
+                                            "type": "string",
+                                            "format": "uri"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "Pet": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Unique identifier for the pet"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the pet",
+                        "minLength": 1,
+                        "maxLength": 100
+                    },
+                    "species": {
+                        "type": "string",
+                        "enum": [
+                            "dog",
+                            "cat",
+                            "bird",
+                            "fish",
+                            "hamster",
+                            "rabbit",
+                            "other"
+                        ],
+                        "description": "Species of the pet"
+                    },
+                    "breed": {
+                        "type": "string",
+                        "description": "Breed of the pet",
+                        "maxLength": 100
+                    },
+                    "age": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 0,
+                        "maximum": 50,
+                        "description": "Age of the pet in years"
+                    },
+                    "weight": {
+                        "type": "number",
+                        "format": "float",
+                        "minimum": 0,
+                        "description": "Weight of the pet in kilograms"
+                    },
+                    "color": {
+                        "type": "string",
+                        "description": "Primary color of the pet",
+                        "maxLength": 50
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "available",
+                            "pending",
+                            "adopted"
+                        ],
+                        "description": "Adoption status of the pet"
+                    },
+                    "photoUrl": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "URL to the pet's photo"
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Timestamp when the pet was added to the system"
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Timestamp when the pet information was last updated"
+                    }
+                }
+            },
+            "NewPet": {
+                "type": "object",
+                "required": [
+                    "name"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the pet",
+                        "minLength": 1,
+                        "maxLength": 100
+                    },
+                    "species": {
+                        "type": "string",
+                        "enum": [
+                            "dog",
+                            "cat",
+                            "bird",
+                            "fish",
+                            "hamster",
+                            "rabbit",
+                            "other"
+                        ],
+                        "description": "Species of the pet"
+                    },
+                    "breed": {
+                        "type": "string",
+                        "description": "Breed of the pet",
+                        "maxLength": 100
+                    },
+                    "age": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 0,
+                        "maximum": 50,
+                        "description": "Age of the pet in years"
+                    },
+                    "weight": {
+                        "type": "number",
+                        "format": "float",
+                        "minimum": 0,
+                        "description": "Weight of the pet in kilograms"
+                    },
+                    "color": {
+                        "type": "string",
+                        "description": "Primary color of the pet",
+                        "maxLength": 50
+                    }
+                }
+            },
+            "Error": {
+                "type": "object",
+                "required": [
+                    "code",
+                    "message"
+                ],
+                "properties": {
+                    "code": {
+                        "type": "integer",
+                        "format": "int32",
+                        "description": "Error code"
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Error message"
+                    },
+                    "details": {
+                        "type": "string",
+                        "description": "Additional error details"
+                    }
+                }
+            }
+        }
+    }
+}

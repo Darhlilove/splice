@@ -5,6 +5,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { ConditionalNavbar } from "@/components/ConditionalNavbar";
 import { Toaster } from "@/components/ui/sonner";
+import { LayoutContent } from "@/components/LayoutContent";
 
 // Tsukimi Rounded for app name/logo
 const tsukimiRounded = localFont({
@@ -58,10 +59,7 @@ export default function RootLayout({
         className={`${tsukimiRounded.variable} ${quicksand.variable} ${poppins.variable} font-body antialiased`}
       >
         <Providers>
-          <div className="min-h-screen flex flex-col">
-            <ConditionalNavbar />
-            <main className="flex-1">{children}</main>
-          </div>
+          <LayoutContent>{children}</LayoutContent>
           <Toaster />
         </Providers>
       </body>
