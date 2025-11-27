@@ -1,0 +1,15 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "pnpm"]
+
+[phases.install]
+cmds = [
+  "pnpm install --frozen-lockfile",
+  "pnpm add -g @stoplight/prism-cli",
+  "pnpm add -g @openapitools/openapi-generator-cli"
+]
+
+[phases.build]
+cmds = ["pnpm build"]
+
+[start]
+cmd = "cd apps/web && pnpm start"
