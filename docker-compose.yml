@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  splice:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    volumes:
+      # Mount temp directories for SDK and mock server files
+      - /tmp/splice-sdks:/tmp/splice-sdks
+      - /tmp/splice-specs:/tmp/splice-specs
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

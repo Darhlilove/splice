@@ -1,0 +1,20 @@
+# Dockerignore
+node_modules
+.next
+.git
+.gitignore
+.env*.local
+.vscode
+.idea
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.DS_Store
+*.pem
+coverage
+.turbo
+dist-test
+test_output*.txt
+.kiro
