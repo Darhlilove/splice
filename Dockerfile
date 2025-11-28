@@ -32,9 +32,8 @@ COPY --from=deps /app/packages/openapi/node_modules ./packages/openapi/node_modu
 # Copy source code
 COPY . .
 
-# Install CLI tools globally
-RUN pnpm add -g @stoplight/prism-cli@latest
-RUN pnpm add -g @openapitools/openapi-generator-cli@latest
+# Install CLI tools as project dependencies in the openapi package
+RUN cd packages/openapi && pnpm add @stoplight/prism-cli@latest @openapitools/openapi-generator-cli@latest
 
 # Build the application
 RUN pnpm build
@@ -51,10 +50,6 @@ WORKDIR /app
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
-
-# Install CLI tools globally
-RUN pnpm add -g @stoplight/prism-cli@latest
-RUN pnpm add -g @openapitools/openapi-generator-cli@latest
 
 # Copy built application
 COPY --from=builder /app/apps/web/.next/standalone ./
