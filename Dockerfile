@@ -55,8 +55,9 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
-COPY --from=builder /app/packages/openapi/dist ./packages/openapi/dist
-COPY --from=builder /app/packages/openapi/node_modules ./packages/openapi/node_modules
+
+# Copy the entire openapi package including CLI tools installed during build
+COPY --from=builder /app/packages/openapi ./packages/openapi
 
 # Set correct permissions
 RUN chown -R nextjs:nodejs /app
