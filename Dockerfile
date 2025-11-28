@@ -69,4 +69,6 @@ ENV PORT=3000
 ENV NODE_ENV=production
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "apps/web/server.js"]
+# Next.js standalone server is at apps/web/server.js
+WORKDIR /app/apps/web
+CMD ["node", "server.js"]
