@@ -8,6 +8,7 @@ cmds = [
 
 [phases.build]
 cmds = [
+  "pnpm rebuild",
   "pnpm build",
   "pnpm add --filter @splice/openapi @stoplight/prism-cli @openapitools/openapi-generator-cli"
 ]
