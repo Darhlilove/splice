@@ -50,6 +50,18 @@ export function ExplorerLayout({
             </h1>
           </div>
           <Button
+            variant="default"
+            onClick={() =>
+              router.push(
+                specId ? `/sdk-generator?specId=${specId}` : "/sdk-generator"
+              )
+            }
+            className="rounded-full"
+          >
+            <Icon icon="lucide:package" className="w-4 h-4 mr-2" />
+            Generate SDK
+          </Button>
+          <Button
             variant="outline"
             onClick={() => router.push("/upload")}
             className="rounded-full"
