@@ -3,8 +3,7 @@ nixPkgs = ["nodejs_20", "pnpm", "openjdk11"]
 
 [phases.install]
 cmds = [
-  "pnpm install --frozen-lockfile",
-  "pnpm add -g @stoplight/prism-cli @openapitools/openapi-generator-cli"
+  "pnpm install --frozen-lockfile"
 ]
 
 [phases.build]
