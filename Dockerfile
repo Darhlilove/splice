@@ -51,13 +51,14 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy built application
+# First, copy the full openapi package with CLI tools from builder
+# This must come BEFORE the standalone copy to ensure it's available
+COPY --from=builder /app/packages/openapi ./packages/openapi
+
+# Then copy built application (standalone will overwrite some files, but that's ok)
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
-
-# Copy the entire openapi package including CLI tools installed during build
-COPY --from=builder /app/packages/openapi ./packages/openapi
 
 # Set correct permissions
 RUN chown -R nextjs:nodejs /app
