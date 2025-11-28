@@ -140,9 +140,8 @@ function ExplorerContent() {
                   </SelectTrigger>
                   <SelectContent>
                     {allSpecs.map((s) => {
-                      const displayText = `${
-                        s.metadata.fileName || s.spec.info.title
-                      } • v${s.spec.info.version}`;
+                      const displayText = `${s.metadata.fileName || s.spec.info.title
+                        } • v${s.spec.info.version}`;
                       return (
                         <SelectItem key={s.specId} value={s.specId}>
                           {displayText}
@@ -164,6 +163,18 @@ function ExplorerContent() {
             >
               <Icon icon="lucide:play" className="w-4 h-4 mr-2" />
               Try API
+            </Button>
+            <Button
+              variant="default"
+              onClick={() =>
+                router.push(
+                  specId ? `/sdk-generator?specId=${specId}` : "/sdk-generator"
+                )
+              }
+              className="h-11 rounded-full px-6"
+            >
+              <Icon icon="lucide:package" className="w-4 h-4 mr-2" />
+              Generate SDK
             </Button>
             <Button
               variant="outline"
@@ -348,7 +359,7 @@ function ExplorerContent() {
                         className={cn(
                           "w-full flex items-center justify-between gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors",
                           selectedSchema === schemaName &&
-                            "bg-muted/50 border-primary"
+                          "bg-muted/50 border-primary"
                         )}
                       >
                         <div className="flex items-center gap-3 flex-1 min-w-0">
