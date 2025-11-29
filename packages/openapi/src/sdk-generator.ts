@@ -704,29 +704,45 @@ Please fix these issues and try again.`;
         // from the OpenAPI spec's description fields (operation summaries, descriptions,
         // schema descriptions, and property descriptions). No additional configuration needed.
 
-        // Resolve binary path
-        let command = "npx";
-        let commandArgs = ["openapi-generator-cli"];
+        // Resolve path to openapi-generator-cli main.js
+        // We use direct Node execution instead of the shell wrapper to avoid path issues
+        let mainJsPath: string | null = null;
 
-        const possiblePaths = [
-          // From apps/web (cwd) -> packages/openapi
-          path.resolve(process.cwd(), "../../packages/openapi/node_modules/.bin/openapi-generator-cli"),
-          // From root (cwd) -> packages/openapi
-          path.resolve(process.cwd(), "packages/openapi/node_modules/.bin/openapi-generator-cli"),
-          // From root (cwd) -> node_modules (hoisted)
-          path.resolve(process.cwd(), "node_modules/.bin/openapi-generator-cli"),
+        const possibleMainJsPaths = [
+          // From apps/web (cwd) -> root node_modules
+          path.resolve(process.cwd(), "../../node_modules/@openapitools/openapi-generator-cli/main.js"),
+          // From root (cwd) -> node_modules
+          path.resolve(process.cwd(), "node_modules/@openapitools/openapi-generator-cli/main.js"),
+          // From apps/web (cwd) -> packages/openapi (legacy)
+          path.resolve(process.cwd(), "../../packages/openapi/node_modules/@openapitools/openapi-generator-cli/main.js"),
+          // From root (cwd) -> packages/openapi (legacy)
+          path.resolve(process.cwd(), "packages/openapi/node_modules/@openapitools/openapi-generator-cli/main.js"),
         ];
 
-        for (const p of possiblePaths) {
+        console.log("[SDKGenerator] Searching for openapi-generator-cli main.js:");
+        console.log(`  Current working directory: ${process.cwd()}`);
+
+        for (const p of possibleMainJsPaths) {
+          console.log(`  Checking: ${p}`);
           if (fs.existsSync(p)) {
-            command = p;
-            commandArgs = [];
+            mainJsPath = p;
+            console.log(`  ✓ Found main.js at: ${p}`);
             break;
           }
         }
 
-        // Spawn OpenAPI Generator process
-        const finalArgs = [...commandArgs, ...args];
+        if (!mainJsPath) {
+          throw new Error(
+            "Could not find openapi-generator-cli. Please ensure @openapitools/openapi-generator-cli is installed."
+          );
+        }
+
+        // Spawn OpenAPI Generator process using Node directly
+        const command = "node";
+        const finalArgs = [mainJsPath, ...args];
+
+        console.log(`[SDKGenerator] Executing: ${command} ${finalArgs.join(" ")}`);
+
         const processChild = spawn(command, finalArgs);
         state.process = processChild;
 
