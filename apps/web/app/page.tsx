@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
+import { Upload, Search, Server, Code, ArrowRight } from "lucide-react";
 
 export default function Home() {
 
@@ -106,49 +107,74 @@ export default function Home() {
       <Separator className="my-12 max-w-6xl" />
 
       {/* Workflow Section */}
-      <div className="text-center max-w-6xl w-full">
+      <div className="text-center max-w-6xl w-full mb-20">
         <h2 className="text-4xl font-bold mb-4">How It Works</h2>
         <p className="text-lg text-muted-foreground mb-12">
           Four simple steps to accelerate your API development
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 relative">
+          {/* Connecting line for desktop */}
+          <div className="hidden md:block absolute top-12 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-border to-transparent -z-10" />
+
           {[
             {
               step: "1",
               title: "Upload",
               desc: "Import your OpenAPI specification",
+              icon: <Upload className="w-6 h-6" />,
+              color: "bg-blue-500/10 text-blue-500",
             },
             {
               step: "2",
               title: "Explore",
               desc: "Browse endpoints and schemas",
+              icon: <Search className="w-6 h-6" />,
+              color: "bg-purple-500/10 text-purple-500",
             },
             {
               step: "3",
               title: "Mock",
               desc: "Test with generated mock servers",
+              icon: <Server className="w-6 h-6" />,
+              color: "bg-pink-500/10 text-pink-500",
             },
             {
               step: "4",
               title: "Generate",
               desc: "Create type-safe SDKs",
+              icon: <Code className="w-6 h-6" />,
+              color: "bg-orange-500/10 text-orange-500",
             },
           ].map((item) => (
-            <Card key={item.step} className="border-2">
-              <CardContent className="text-center p-8 space-y-3">
-                <Badge
-                  variant="secondary"
-                  className="text-2xl font-bold w-14 h-14 flex items-center justify-center rounded-full"
-                >
-                  {item.step}
-                </Badge>
-                <h3 className="text-xl font-bold">{item.title}</h3>
-                <p className="text-sm text-muted-foreground">{item.desc}</p>
+            <Card key={item.step} className="border-2 hover:border-primary/50 transition-colors bg-card/50 backdrop-blur-sm">
+              <CardContent className="flex flex-col items-center text-center p-6 pt-8 space-y-4">
+                <div className={`w-16 h-16 rounded-2xl ${item.color} flex items-center justify-center mb-2 shadow-sm`}>
+                  {item.icon}
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-bold">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground">{item.desc}</p>
+                </div>
               </CardContent>
             </Card>
           ))}
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="w-full py-8 mt-auto border-t">
+        <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="text-sm text-muted-foreground">
+            © {new Date().getFullYear()} Splice. All rights reserved.
+          </div>
+          <div className="flex items-center gap-6 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary/50">
+              <span>Built with</span>
+              <span className="font-semibold text-foreground">Kiro</span>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
