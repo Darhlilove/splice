@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Poppins, Quicksand } from "next/font/google";
 import localFont from "next/font/local";
+import Script from "next/script";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Toaster } from "@/components/ui/sonner";
@@ -77,6 +78,38 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Google Analytics */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-KRM3SDVTM0"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-KRM3SDVTM0');
+          `}
+        </Script>
+
+        {/* Iubenda Cookie Consent */}
+        <Script id="iubenda-config" strategy="afterInteractive">
+          {`
+            var _iub = _iub || [];
+            _iub.csConfiguration = {"siteId":4334525,"cookiePolicyId":37695076,"lang":"en","storage":{"useSiteId":true}};
+          `}
+        </Script>
+        <Script
+          src="https://cs.iubenda.com/autoblocking/4334525.js"
+          strategy="afterInteractive"
+        />
+        <Script src="//cdn.iubenda.com/cs/gpp/stub.js" strategy="afterInteractive" />
+        <Script
+          src="//cdn.iubenda.com/cs/iubenda_cs.js"
+          strategy="afterInteractive"
+        />
+      </head>
       <body
         className={`${tsukimiRounded.variable} ${quicksand.variable} ${poppins.variable} font-body antialiased`}
       >
