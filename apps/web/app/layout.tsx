@@ -3,7 +3,6 @@ import { Poppins, Quicksand } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "./providers";
-import { ConditionalNavbar } from "@/components/ConditionalNavbar";
 import { Toaster } from "@/components/ui/sonner";
 import { LayoutContent } from "@/components/LayoutContent";
 
@@ -44,8 +43,31 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Splice - API Schema Explorer",
-  description: "OpenAPI schema exploration and development tool",
+  title: "Splice - From Schema to SDK in Minutes",
+  description: "Complete OpenAPI workflow tool. Upload your spec, explore endpoints interactively, spin up mock servers, and generate type-safe SDKs—all in one seamless experience.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://splice-production-80f1.up.railway.app'),
+  openGraph: {
+    title: "Splice - From Schema to SDK in Minutes",
+    description: "Complete OpenAPI workflow tool. Upload your spec, explore endpoints interactively, spin up mock servers, and generate type-safe SDKs.",
+    url: '/',
+    siteName: 'Splice',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Splice - OpenAPI Development Tool',
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: "Splice - From Schema to SDK in Minutes",
+    description: "Complete OpenAPI workflow tool. Upload, explore, mock, and generate SDKs from your OpenAPI specs.",
+    images: ['/og-image.png'],
+  },
 };
 
 export default function RootLayout({
