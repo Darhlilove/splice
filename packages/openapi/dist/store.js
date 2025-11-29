@@ -1,11 +1,22 @@
 /**
- * In-memory store for parsed OpenAPI specifications
- * Stores specs temporarily during a session for quick retrieval
+ * Store for parsed OpenAPI specifications
+ * Uses Redis for persistence if configured, otherwise falls back to in-memory Map
  */
-// In-memory storage
-const specStore = new Map();
-// Auto-cleanup: Remove specs older than 1 hour
-const EXPIRY_TIME = 60 * 60 * 1000; // 1 hour in milliseconds
+import Redis from "ioredis";
+// Redis client
+let redis = null;
+if (process.env.REDIS_URL) {
+    console.log("[Store] Initializing Redis client");
+    redis = new Redis(process.env.REDIS_URL);
+}
+else {
+    console.log("[Store] No REDIS_URL found, using in-memory storage");
+}
+// In-memory fallback
+const memoryStore = new Map();
+// Expiry: 24 hours in seconds for Redis, milliseconds for memory
+const EXPIRY_SECONDS = 24 * 60 * 60;
+const EXPIRY_MS = EXPIRY_SECONDS * 1000;
 /**
  * Generate a unique spec ID
  */
@@ -19,19 +30,24 @@ export function generateSpecId() {
  * @param metadata - Optional metadata about the spec
  * @returns The spec ID
  */
-export function saveSpec(specId, spec, metadata, originalSpec) {
+export async function saveSpec(specId, spec, metadata, originalSpec) {
     console.log(`[Store] Saving spec with ID: ${specId}`);
-    specStore.set(specId, {
+    const data = {
         spec,
         originalSpec,
-        metadata: Object.assign(Object.assign({}, metadata), { uploadedAt: new Date() }),
-    });
-    console.log(`[Store] Store size after save: ${specStore.size}`);
-    // Schedule cleanup
-    setTimeout(() => {
-        console.log(`[Store] Cleaning up spec: ${specId}`);
-        specStore.delete(specId);
-    }, EXPIRY_TIME);
+        metadata: Object.assign(Object.assign({}, metadata), { uploadedAt: new Date().toISOString() }),
+    };
+    const serialized = JSON.stringify(data);
+    if (redis) {
+        await redis.setex(specId, EXPIRY_SECONDS, serialized);
+    }
+    else {
+        memoryStore.set(specId, serialized);
+        // Schedule cleanup for memory store
+        setTimeout(() => {
+            memoryStore.delete(specId);
+        }, EXPIRY_MS);
+    }
     return specId;
 }
 /**
@@ -39,48 +55,78 @@ export function saveSpec(specId, spec, metadata, originalSpec) {
  * @param specId - The spec ID to retrieve
  * @returns The stored spec and metadata, or null if not found
  */
-export function getSpec(specId) {
+export async function getSpec(specId) {
     console.log(`[Store] Retrieving spec with ID: ${specId}`);
-    console.log(`[Store] Current store size: ${specStore.size}`);
-    console.log(`[Store] All keys:`, Array.from(specStore.keys()));
-    const stored = specStore.get(specId);
-    if (!stored) {
+    let serialized = null;
+    if (redis) {
+        serialized = await redis.get(specId);
+    }
+    else {
+        serialized = memoryStore.get(specId) || null;
+    }
+    if (!serialized) {
         console.log(`[Store] Spec not found: ${specId}`);
         return null;
     }
-    // Check if expired
-    const age = Date.now() - stored.metadata.uploadedAt.getTime();
-    if (age > EXPIRY_TIME) {
-        console.log(`[Store] Spec expired: ${specId}`);
-        specStore.delete(specId);
+    try {
+        const stored = JSON.parse(serialized);
+        console.log(`[Store] Spec found: ${specId}`);
+        return stored;
+    }
+    catch (error) {
+        console.error(`[Store] Failed to parse spec ${specId}:`, error);
         return null;
     }
-    console.log(`[Store] Spec found: ${specId}`);
-    return stored;
 }
 /**
  * Delete a spec from the store
  * @param specId - The spec ID to delete
  * @returns True if deleted, false if not found
  */
-export function deleteSpec(specId) {
-    return specStore.delete(specId);
+export async function deleteSpec(specId) {
+    if (redis) {
+        const result = await redis.del(specId);
+        return result > 0;
+    }
+    else {
+        return memoryStore.delete(specId);
+    }
 }
 /**
  * Clear all specs from the store
  */
-export function clearAllSpecs() {
-    specStore.clear();
+export async function clearAllSpecs() {
+    if (redis) {
+        const keys = await redis.keys("spec-*");
+        if (keys.length > 0) {
+            await redis.del(...keys);
+        }
+    }
+    else {
+        memoryStore.clear();
+    }
 }
 /**
  * Get the number of specs currently stored
+ * Note: For Redis, this counts keys matching "spec-*"
  */
-export function getStoreSize() {
-    return specStore.size;
+export async function getStoreSize() {
+    if (redis) {
+        const keys = await redis.keys("spec-*");
+        return keys.length;
+    }
+    else {
+        return memoryStore.size;
+    }
 }
 /**
  * Get all spec IDs currently in the store
  */
-export function getAllSpecIds() {
-    return Array.from(specStore.keys());
+export async function getAllSpecIds() {
+    if (redis) {
+        return redis.keys("spec-*");
+    }
+    else {
+        return Array.from(memoryStore.keys());
+    }
 }

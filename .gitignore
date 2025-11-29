@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Notes folder
 /notes
+
+# Submission folder
+/submission-files

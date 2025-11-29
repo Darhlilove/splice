@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the original spec from the store
-    let storedSpec = getSpec(specId);
+    let storedSpec = await getSpec(specId);
 
     // If spec not found in store but provided in body (client-side fallback), use it
     if (!storedSpec && body.spec) {
@@ -32,11 +32,11 @@ export async function POST(request: NextRequest) {
       // Extract originalSpec if it exists in the body, otherwise use the spec itself
       const originalSpec = body.spec.originalSpec || body.spec;
 
-      saveSpec(specId, body.spec, {
+      await saveSpec(specId, body.spec, {
         source: "client-fallback",
       }, originalSpec);
 
-      storedSpec = getSpec(specId);
+      storedSpec = await getSpec(specId);
     }
 
     if (!storedSpec) {

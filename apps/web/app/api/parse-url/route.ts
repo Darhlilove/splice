@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     // Generate spec ID and save to store
     const specId = generateSpecId();
-    saveSpec(specId, parsedSpec, {
+    await saveSpec(specId, parsedSpec, {
       source: url,
     }, parsedSpec.originalSpec);
 

@@ -16,7 +16,7 @@ export async function GET(
     }
 
     console.log("Retrieving spec with ID:", specId);
-    const stored = getSpec(specId);
+    const stored = await getSpec(specId);
 
     if (!stored) {
       return NextResponse.json(

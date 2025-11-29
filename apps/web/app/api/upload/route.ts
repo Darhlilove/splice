@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       const specId = generateSpecId();
       console.log("Generated specId:", specId);
 
-      const savedId = saveSpec(specId, parsedSpec, {
+      const savedId = await saveSpec(specId, parsedSpec, {
         fileName: file.name,
         fileSize: file.size,
       }, parsedSpec.originalSpec);

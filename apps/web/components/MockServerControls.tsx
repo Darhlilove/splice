@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMockServer, MockServerInfo } from "@/contexts/mock-server-context";
 import type { OpenAPISpec } from "@splice/openapi";
+import { toast } from "sonner";
 
 interface MockServerControlsProps {
   specId: string;
@@ -183,17 +184,31 @@ export function MockServerControls({
         {/* Server URL */}
         {isRunning && mockServerInfo && (
           <div className="space-y-2">
-            <div className="text-sm font-medium">Server URL:</div>
-            <a
-              href={mockServerInfo.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline break-all"
-            >
-              {mockServerInfo.url}
-            </a>
+            <div className="text-sm font-medium">Public Gateway URL:</div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-sm bg-muted px-3 py-2 rounded-md break-all">
+                {typeof window !== "undefined"
+                  ? `${window.location.origin}/api/mock-gateway/${specId}`
+                  : `/api/mock-gateway/${specId}`}
+              </code>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const url =
+                    typeof window !== "undefined"
+                      ? `${window.location.origin}/api/mock-gateway/${specId}`
+                      : `/api/mock-gateway/${specId}`;
+                  navigator.clipboard.writeText(url);
+                  toast.success("Gateway URL copied to clipboard!");
+                }}
+              >
+                Copy
+              </Button>
+            </div>
             <div className="text-xs text-muted-foreground">
-              Port: {mockServerInfo.port}
+              Internal Port: {mockServerInfo.port} • Accessible externally via
+              gateway
             </div>
           </div>
         )}
@@ -273,22 +288,22 @@ export function MockServerControls({
 
             {(error.includes("YAML parsing error") ||
               error.includes("JSON parsing error")) && (
-              <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-800 space-y-2">
-                <div className="text-xs font-semibold">How to fix:</div>
-                <div className="text-xs">
-                  Your OpenAPI spec has syntax errors. Validate your spec using
-                  an online validator:
+                <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-800 space-y-2">
+                  <div className="text-xs font-semibold">How to fix:</div>
+                  <div className="text-xs">
+                    Your OpenAPI spec has syntax errors. Validate your spec using
+                    an online validator:
+                  </div>
+                  <a
+                    href="https://editor.swagger.io/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block text-blue-600 dark:text-blue-400 hover:underline text-xs"
+                  >
+                    Open Swagger Editor →
+                  </a>
                 </div>
-                <a
-                  href="https://editor.swagger.io/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block text-blue-600 dark:text-blue-400 hover:underline text-xs"
-                >
-                  Open Swagger Editor →
-                </a>
-              </div>
-            )}
+              )}
 
             {error.includes("No available ports") && (
               <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-800 space-y-2">
