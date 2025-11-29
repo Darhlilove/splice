@@ -11,11 +11,10 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { QuickDemo } from "@/components/QuickDemo";
 import Link from "next/link";
 
 export default function Home() {
-  const [showDemo, setShowDemo] = React.useState(false);
+
   const features = [
     {
       title: "Upload Spec",
@@ -73,18 +72,10 @@ export default function Home() {
         </p>
         <div className="flex flex-wrap gap-4 justify-center pt-6">
           <Link href="/upload">
-            <Button size="lg" className="text-lg">
+            <Button size="lg" className="text-lg w-[250px] h-[50px] rounded-full">
               Get Started →
             </Button>
           </Link>
-          <Button
-            size="lg"
-            variant="outline"
-            className="text-lg"
-            onClick={() => setShowDemo(true)}
-          >
-            Quick Demo
-          </Button>
         </div>
       </div>
 
@@ -110,18 +101,7 @@ export default function Home() {
         ))}
       </div>
 
-      {/* Quick Demo Section */}
-      {showDemo && (
-        <div className="w-full max-w-6xl mb-20">
-          <QuickDemo
-            onExit={() => setShowDemo(false)}
-            onComplete={() => {
-              // Keep demo visible after completion
-              // User can manually close it
-            }}
-          />
-        </div>
-      )}
+
 
       <Separator className="my-12 max-w-6xl" />
 
