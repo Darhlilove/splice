@@ -211,161 +211,89 @@ export function ExecuteButton({
    */
   const executeRequest = React.useCallback(
     async (isRetry: boolean = false) => {
-      // Validate parameters first
-      const errors = validateParameters();
-      setValidationErrors(errors);
-
-      if (errors.length > 0) {
-        // Don't execute if there are validation errors
-        const validationError: RequestError = {
-          type: "validation",
-          message:
-            "Please fix the validation errors before executing the request",
-          details: errors,
-        };
-        onError(validationError);
-        return;
-      }
-
       // Reset retry count if this is a new request (not a retry)
       if (!isRetry) {
         setRetryCount(0);
       }
 
       setIsLoading(true);
+      setValidationErrors([]);
 
       try {
-        // Organize parameters by location
-        const organizedParams = organizeParameters();
+        // Import dynamically to avoid circular dependencies if any
+        const { executeRequest: execute } = await import("@/lib/request-executor");
 
-        // Build URL with path parameters
-        const url = buildUrl(organizedParams.path);
+        const result = await execute(
+          endpoint,
+          baseUrl,
+          parameters,
+          requestBody,
+          contentType,
+          authentication
+        );
 
-        // Build headers
-        const headers = buildHeaders(organizedParams.header);
-
-        // Add query parameters to URL
-        const urlWithQuery = new URL(url, window.location.origin);
-        Object.entries(organizedParams.query).forEach(([key, value]) => {
-          urlWithQuery.searchParams.append(key, value);
-        });
-
-        // Add API key to query if needed
-        if (
-          authentication.type === "apiKey" &&
-          authentication.apiKeyLocation === "query"
-        ) {
-          urlWithQuery.searchParams.append(
-            authentication.apiKeyName || "api_key",
-            authentication.apiKey || ""
-          );
-        }
-
-        // Prepare request body
-        let body: string | undefined;
-        if (
-          requestBody &&
-          (endpoint.method === "post" ||
-            endpoint.method === "put" ||
-            endpoint.method === "patch")
-        ) {
-          if (typeof requestBody === "string") {
-            body = requestBody;
-          } else {
-            body = JSON.stringify(requestBody);
-          }
-        }
-
-        // Record start time
-        const startTime = performance.now();
-
-        // Make request to proxy
-        const response = await fetch("/api/proxy", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            url: urlWithQuery.toString(),
-            method: endpoint.method.toUpperCase(),
-            headers,
-            body,
-            timeout: 30000, // 30 second timeout
-          }),
-        });
-
-        // Calculate response time
-        const responseTime = performance.now() - startTime;
-
-        // Parse response
-        const data = await response.json();
-
-        if (!response.ok) {
-          // Handle error response from proxy
-          const error: RequestError = {
-            type: data.type || "server",
-            message:
-              data.message || `Request failed with status ${response.status}`,
-            details: data.details,
-          };
-
-          // Implement retry logic for network and timeout errors
-          if (
-            (error.type === "network" || error.type === "timeout") &&
-            retryCount < maxRetries
-          ) {
-            setRetryCount((prev) => prev + 1);
-            // Wait before retrying (exponential backoff)
-            const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
-            await new Promise((resolve) => setTimeout(resolve, delay));
-            // Retry the request
-            return executeRequest(true);
-          }
-
-          onError(error);
-        } else {
-          // Handle successful response
-          const apiResponse: APIResponse = {
-            status: data.status,
-            statusText: data.statusText,
-            headers: data.headers || {},
-            body: data.body,
-            responseTime: data.responseTime || responseTime,
-            timestamp: new Date(),
-            contentType: data.headers?.["content-type"] || "application/json",
-          };
-
+        if (result.success && result.response) {
           // Add to history store
           try {
             const historyStore = getHistoryStore();
-            const responseData: ResponseData = {
-              status: apiResponse.status,
-              statusText: apiResponse.statusText,
-              headers: apiResponse.headers,
-              body: apiResponse.body,
-              duration: apiResponse.responseTime,
-              responseTime: apiResponse.responseTime,
-              timestamp: apiResponse.timestamp,
-              contentType: apiResponse.contentType,
-            };
-
             historyStore.addEntry(
               endpoint.method,
-              urlWithQuery.toString(),
+              endpoint.path, // Use path as URL for history since full URL is built internally
               parameters,
-              responseData,
+              result.response,
               requestBody,
               authentication
             );
           } catch (historyError) {
-            // Don't fail the request if history storage fails
             console.error("Failed to add entry to history:", historyError);
           }
 
-          onExecute(apiResponse);
+          onExecute({
+            status: result.response.status,
+            statusText: result.response.statusText,
+            headers: result.response.headers || {},
+            body: result.response.body,
+            responseTime: result.response.duration,
+            timestamp: result.response.timestamp,
+            contentType: result.response.contentType,
+          });
+        } else {
+          // Handle validation errors
+          if (result.validationErrors && result.validationErrors.length > 0) {
+            setValidationErrors(result.validationErrors);
+            const validationError: RequestError = {
+              type: "validation",
+              message: "Please fix the validation errors before executing the request",
+              details: result.validationErrors,
+            };
+            // Don't call onError for validation errors, just show them in the UI
+            // onError(validationError); 
+          } else if (result.error) {
+            // Handle other errors
+            const error: RequestError = {
+              type: "server",
+              message: result.error,
+            };
+
+            // Implement retry logic for network errors
+            if (
+              (result.error.toLowerCase().includes("network") ||
+                result.error.toLowerCase().includes("timeout")) &&
+              retryCount < maxRetries
+            ) {
+              setRetryCount((prev) => prev + 1);
+              // Wait before retrying (exponential backoff)
+              const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
+              await new Promise((resolve) => setTimeout(resolve, delay));
+              // Retry the request
+              return executeRequest(true);
+            }
+
+            onError(error);
+          }
         }
       } catch (error) {
-        // Handle network or other errors
+        // Handle unexpected errors
         const requestError: RequestError = {
           type: "network",
           message:
@@ -374,29 +302,17 @@ export function ExecuteButton({
               : "An unknown error occurred",
           details: error,
         };
-
-        // Implement retry logic for network errors
-        if (retryCount < maxRetries) {
-          setRetryCount((prev) => prev + 1);
-          // Wait before retrying (exponential backoff)
-          const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          // Retry the request
-          return executeRequest(true);
-        }
-
         onError(requestError);
       } finally {
         setIsLoading(false);
       }
     },
     [
-      validateParameters,
-      organizeParameters,
-      buildUrl,
-      buildHeaders,
-      endpoint.method,
+      endpoint,
+      baseUrl,
+      parameters,
       requestBody,
+      contentType,
       authentication,
       onExecute,
       onError,
@@ -461,7 +377,7 @@ export function ExecuteButton({
           Press{" "}
           <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-muted border border-border rounded">
             {typeof navigator !== "undefined" &&
-            navigator.platform.toLowerCase().includes("mac")
+              navigator.platform.toLowerCase().includes("mac")
               ? "⌘"
               : "Ctrl"}
           </kbd>{" "}

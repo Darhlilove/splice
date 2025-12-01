@@ -39,6 +39,13 @@ export function validateInputs(
   // Validate parameters
   if (endpoint.parameters) {
     endpoint.parameters.forEach((param) => {
+      // Skip body parameters - they are validated separately in the requestBody section
+      // This handles Swagger 2.0 specs where body was defined as a parameter
+      // @ts-ignore - Swagger 2.0 specs can have 'in: body' even though OpenAPI 3.0 types don't include it
+      if (param.in === "body") {
+        return;
+      }
+
       const value = parameters[param.name];
       const result = validateParameter(param, value);
 
@@ -56,13 +63,19 @@ export function validateInputs(
   if (endpoint.requestBody) {
     const bodySchema = endpoint.requestBody.content[contentType]?.schema;
 
-    if (endpoint.requestBody.required && !requestBody) {
+    // Check if body is truly missing (undefined or null) vs just empty
+    const isBodyMissing = requestBody === undefined || requestBody === null;
+    const isBodyEmpty =
+      requestBody === "" ||
+      (typeof requestBody === "object" && Object.keys(requestBody || {}).length === 0);
+
+    if (endpoint.requestBody.required && (isBodyMissing || isBodyEmpty)) {
       errors.push({
         field: "body",
-        message: "Request body is required",
+        message: "This field is required and cannot be empty",
         type: "required",
       });
-    } else if (requestBody && bodySchema) {
+    } else if (requestBody && !isBodyEmpty && bodySchema) {
       const bodyValidation = validateRequestBody(
         requestBody,
         bodySchema,
@@ -80,6 +93,8 @@ export function validateInputs(
       }
     }
   }
+
+  console.log("[DEBUG] validateInputs returning errors:", errors);
 
   return errors;
 }

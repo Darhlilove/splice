@@ -29,6 +29,7 @@ export function validateRequestBody(
       // Validate JSON syntax
       try {
         const parsed = JSON.parse(value);
+
         // Validate against schema
         const schemaErrors = validateValueAgainstSchema(parsed, schema, "body");
         validationErrors.push(...schemaErrors);
