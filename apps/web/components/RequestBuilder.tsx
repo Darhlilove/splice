@@ -676,7 +676,7 @@ export function RequestBuilder({
               Press{" "}
               <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-muted border border-border rounded">
                 {typeof navigator !== "undefined" &&
-                navigator.platform.toLowerCase().includes("mac")
+                  navigator.platform.toLowerCase().includes("mac")
                   ? "⌘"
                   : "Ctrl"}
               </kbd>{" "}

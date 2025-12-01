@@ -3,8 +3,6 @@
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ConditionalNavbar } from "@/components/ConditionalNavbar";
-import { WorkflowProgress } from "@/components/WorkflowProgress";
-import { WorkflowNavigation } from "@/components/WorkflowNavigation";
 import { useWorkflow } from "@/contexts/workflow-context";
 import { PageErrorBoundary } from "@/components/ErrorBoundary";
 

@@ -63,6 +63,11 @@ export const metadata: Metadata = {
     locale: 'en_US',
     type: 'website',
   },
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
   twitter: {
     card: 'summary_large_image',
     title: "Splice - From Schema to SDK in Minutes",

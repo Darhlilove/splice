@@ -18,6 +18,11 @@ export async function GET(request: NextRequest) {
     // Get mock server manager instance
     const manager = getMockServerManager();
 
+    // Debug: Log all available servers
+    const allServers = manager.getAllServers();
+    console.log(`[Mock Status] All server IDs:`, Array.from(allServers.keys()));
+    console.log(`[Mock Status] Requested specId: ${specId}`);
+
     // Get server info
     const serverInfo = manager.getServerInfo(specId);
 

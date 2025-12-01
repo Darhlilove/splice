@@ -72,12 +72,13 @@ export function MockServerStatus() {
 
   // Handle copy URL to clipboard
   const handleCopyUrl = async () => {
-    if (!serverUrl) return;
+    if (!state.specId) return;
 
     try {
-      await navigator.clipboard.writeText(serverUrl);
+      const gatewayUrl = `${window.location.origin}/api/mock-gateway/${state.specId}`;
+      await navigator.clipboard.writeText(gatewayUrl);
       setIsCopying(true);
-      toast.success("URL copied to clipboard");
+      toast.success("Gateway URL copied to clipboard");
       setTimeout(() => setIsCopying(false), 2000);
     } catch (error) {
       console.error("Failed to copy URL:", error);
@@ -219,9 +220,7 @@ export function MockServerStatus() {
         {/* Server URL - Requirement 4.2 - Hidden on mobile */}
         {isRunning && serverUrl && (
           <>
-            <div className="hidden md:block text-xs text-muted-foreground max-w-[150px] lg:max-w-[200px] truncate font-mono">
-              {serverUrl}
-            </div>
+
 
             {/* Copy URL Button - Requirement 4.3 */}
             <Tooltip>

@@ -11,7 +11,7 @@ import { Icon } from "@iconify/react";
 import { useStoredSpec } from "@/hooks/use-stored-spec";
 import { useRequestHistory } from "@/hooks/use-request-history";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import type { Endpoint } from "@splice/openapi";
 import type { ResponseData } from "@/types/request-builder";
 import { toast } from "sonner";
@@ -24,6 +24,7 @@ function ApiExplorerContent() {
   const [selectedEndpoint, setSelectedEndpoint] = useState<Endpoint | null>(
     null
   );
+  const [isMounted, setIsMounted] = useState(false);
 
   // History management
   const { history, selectedEntry, selectEntry, clearHistory, exportHistory } =
@@ -32,6 +33,23 @@ function ApiExplorerContent() {
   // State for displaying historical response
   const [displayedResponse, setDisplayedResponse] =
     useState<ResponseData | null>(null);
+
+  // Prevent hydration mismatch by only rendering after mount
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Show loading during SSR/hydration
+  if (!isMounted) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Icon
+          icon="lucide:loader-2"
+          className="w-12 h-12 animate-spin text-primary"
+        />
+      </div>
+    );
+  }
 
   if (!hasSpec || !spec) {
     return (

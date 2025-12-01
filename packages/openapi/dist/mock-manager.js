@@ -298,6 +298,7 @@ export class MockServerManager {
                 "--port",
                 port.toString(),
                 "--dynamic",
+                "--errors=false", // Allow dynamic responses even when proper response definitions are missing
             ]);
             let startupOutput = "";
             let hasStarted = false;
@@ -476,13 +477,14 @@ export class MockServerManager {
     }
 }
 // Singleton instance
-let managerInstance = null;
+// Use globalThis to persist across module reloads in development
+const globalForMockManager = globalThis;
 /**
  * Get the singleton MockServerManager instance
  */
 export function getMockServerManager() {
-    if (!managerInstance) {
-        managerInstance = new MockServerManager();
+    if (!globalForMockManager.mockServerManager) {
+        globalForMockManager.mockServerManager = new MockServerManager();
     }
-    return managerInstance;
+    return globalForMockManager.mockServerManager;
 }

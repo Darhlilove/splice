@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Two connecting brackets suggesting "splicing" -->
+  <path d="M 8 6 L 4 6 L 4 26 L 8 26" 
+        stroke="url(#grad)" 
+        stroke-width="2.5" 
+        fill="none" 
+        stroke-linecap="round"/>
+  
+  <path d="M 24 6 L 28 6 L 28 26 L 24 26" 
+        stroke="url(#grad)" 
+        stroke-width="2.5" 
+        fill="none" 
+        stroke-linecap="round"/>
+  
+  <!-- Connecting lines in the middle -->
+  <line x1="12" y1="12" x2="20" y2="12" 
+        stroke="url(#grad)" 
+        stroke-width="2" 
+        stroke-linecap="round"/>
+  
+  <line x1="12" y1="20" x2="20" y2="20" 
+        stroke="url(#grad)" 
+        stroke-width="2" 
+        stroke-linecap="round"/>
+  
+  <!-- Connection dots -->
+  <circle cx="12" cy="12" r="2" fill="#6366f1"/>
+  <circle cx="20" cy="12" r="2" fill="#8b5cf6"/>
+  <circle cx="12" cy="20" r="2" fill="#6366f1"/>
+  <circle cx="20" cy="20" r="2" fill="#8b5cf6"/>
+</svg>

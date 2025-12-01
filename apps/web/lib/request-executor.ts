@@ -39,14 +39,13 @@ export function validateInputs(
   // Validate parameters
   if (endpoint.parameters) {
     endpoint.parameters.forEach((param) => {
-      // Skip body parameters - they are validated separately in the requestBody section
-      // This handles Swagger 2.0 specs where body was defined as a parameter
+      // Skip body parameters in Swagger 2.0 - they're validated separately via requestBody
       // @ts-ignore - Swagger 2.0 specs can have 'in: body' even though OpenAPI 3.0 types don't include it
       if (param.in === "body") {
         return;
       }
 
-      const value = parameters[param.name];
+      const value: ParameterValue = parameters[param.name];
       const result = validateParameter(param, value);
 
       if (!result.isValid && result.error) {
