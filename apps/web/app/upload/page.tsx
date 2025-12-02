@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 import { UploadForm } from "@/components/UploadForm";
 import { useWorkflow } from "@/contexts/workflow-context";
-
 import { useSearchParams } from "next/navigation";
 
-export default function UploadPage() {
+function UploadContent() {
   const { setCurrentStep } = useWorkflow();
   const searchParams = useSearchParams();
   const mode = searchParams.get("mode") as "file" | "url" | null;
@@ -32,12 +31,20 @@ export default function UploadPage() {
   };
 
   return (
+    <UploadForm
+      onSubmit={handleSubmit}
+      initialMode={mode || "file"}
+      initialUrl={url || ""}
+    />
+  );
+}
+
+export default function UploadPage() {
+  return (
     <div className="flex min-h-screen items-center justify-center p-8">
-      <UploadForm
-        onSubmit={handleSubmit}
-        initialMode={mode || "file"}
-        initialUrl={url || ""}
-      />
+      <Suspense fallback={<div className="animate-pulse">Loading...</div>}>
+        <UploadContent />
+      </Suspense>
     </div>
   );
 }
