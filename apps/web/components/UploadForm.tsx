@@ -17,13 +17,15 @@ type UploadMode = "file" | "url";
 
 interface UploadFormProps {
   onSubmit?: (data: { mode: UploadMode; file?: File; url?: string }) => void;
+  initialMode?: UploadMode;
+  initialUrl?: string;
 }
 
-export function UploadForm({ onSubmit }: UploadFormProps) {
-  const [mode, setMode] = useState<UploadMode>("file");
+export function UploadForm({ onSubmit, initialMode = "file", initialUrl = "" }: UploadFormProps) {
+  const [mode, setMode] = useState<UploadMode>(initialMode);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileError, setFileError] = useState<string>("");
-  const [urlValue, setUrlValue] = useState("");
+  const [urlValue, setUrlValue] = useState(initialUrl);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [storedSpecsCount] = useState(() => {
@@ -361,10 +363,9 @@ export function UploadForm({ onSubmit }: UploadFormProps) {
               className={`
                 border-2 border-dashed rounded-2xl p-12 text-center
                 transition-colors cursor-pointer
-                ${
-                  isDragging
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/50"
+                ${isDragging
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary/50"
                 }
               `}
               onClick={() => fileInputRef.current?.click()}

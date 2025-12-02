@@ -4,8 +4,13 @@ import { useEffect } from "react";
 import { UploadForm } from "@/components/UploadForm";
 import { useWorkflow } from "@/contexts/workflow-context";
 
+import { useSearchParams } from "next/navigation";
+
 export default function UploadPage() {
   const { setCurrentStep } = useWorkflow();
+  const searchParams = useSearchParams();
+  const mode = searchParams.get("mode") as "file" | "url" | null;
+  const url = searchParams.get("url");
 
   // Set current step to upload when page loads
   useEffect(() => {
@@ -28,7 +33,11 @@ export default function UploadPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-8">
-      <UploadForm onSubmit={handleSubmit} />
+      <UploadForm
+        onSubmit={handleSubmit}
+        initialMode={mode || "file"}
+        initialUrl={url || ""}
+      />
     </div>
   );
 }
