@@ -4,7 +4,8 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run copy-templates",
+    "copy-templates": "mkdir -p dist/sdk-templates && cp -r src/sdk-templates/* dist/sdk-templates/",
     "dev": "tsc --watch",
     "test:parser": "tsx test-parser.ts",
     "test:sdk-generator": "tsx test-sdk-generator.ts"

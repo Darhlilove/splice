@@ -1,0 +1,69 @@
+/**
+ * SDK Client
+ * Main entry point for the SDK with configured services
+ */
+
+import { Configuration } from './configuration';
+import type { SdkConfig } from './config';
+import { createConfig } from './config';
+import { HttpClient } from './http/httpClient';
+import { AuthInterceptor, LoggingInterceptor, ErrorInterceptor } from './http/interceptors';
+import type { CredentialProvider } from './auth/credentialProvider';
+
+/**
+ * SDK Client Options
+ */
+export interface ClientOptions {
+  baseUrl?: string;
+  apiKey?: string;
+  credentialProvider?: CredentialProvider;
+  timeout?: number;
+  headers?: Record<string, string>;
+  enableLogging?: boolean;
+}
+
+/**
+ * Create SDK Client
+ * @param options - Client configuration options
+ * 
+ * @example
+ * ```typescript
+ * // Using environment variables
+ * const client = createClient();
+ * 
+ * // With custom configuration
+ * const client = createClient({
+ *   baseUrl: 'https://api.example.com',
+ *   credentialProvider: new EnvCredentialProvider()
+ * });
+ * ```
+ */
+export function createClient(options?: ClientOptions) {
+  // Create configuration
+  const config = createConfig({
+    baseUrl: options?.baseUrl,
+    apiKey: options?.apiKey,
+    timeout: options?.timeout,
+    headers: options?.headers,
+  });
+
+  // Create HTTP client with interceptors
+  const httpClient = new HttpClient({
+    ...config,
+    credentialProvider: options?.credentialProvider,
+    enableLogging: options?.enableLogging,
+  });
+
+  // Create OpenAPI configuration
+  const configuration = new Configuration({
+    basePath: config.baseUrl,
+    apiKey: config.apiKey,
+    headers: config.headers,
+  });
+
+  return {
+    configuration,
+    httpClient,
+    // Individual API services will be added here by the generator
+  };
+}

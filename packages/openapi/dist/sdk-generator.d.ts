@@ -41,6 +41,7 @@ export declare class SDKGenerator {
     private readonly GENERATION_TIMEOUT_MS;
     private readonly configValidator;
     private readonly readmeGenerator;
+    private readonly sdkEnhancer;
     private openAPIGeneratorAvailable;
     /**
      * Log error with detailed information

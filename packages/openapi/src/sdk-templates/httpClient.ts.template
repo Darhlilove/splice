@@ -1,0 +1,199 @@
+/**
+ * Enhanced HTTP Client with Interceptors and Retry Logic
+ * Provides centralized request handling with authentication, logging, and error handling
+ */
+
+import { Configuration } from './configuration';
+import { CredentialProvider } from './credentialProvider';
+
+export interface HttpClientConfig {
+  baseUrl: string;
+  timeout?: number;
+  headers?: Record<string, string>;
+  credentialProvider?: CredentialProvider;
+  apiKey?: string;
+  retryAttempts?: number;
+  retryDelay?: number;
+  enableLogging?: boolean;
+}
+
+export interface RequestConfig {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  url: string;
+  params?: Record<string, any>;
+  data?: any;
+  headers?: Record<string, string>;
+}
+
+/**
+ * Enhanced HTTP Client
+ * Wraps the generated API client with additional features:
+ * - Automatic authentication via credential providers
+ * - Request/response interceptors
+ * - Retry logic with exponential backoff
+ * - Centralized error handling
+ * - Request logging
+ */
+export class HttpClient {
+  private config: HttpClientConfig;
+
+  constructor(config: HttpClientConfig) {
+    this.config = {
+      retryAttempts: 3,
+      retryDelay: 1000,
+      enableLogging: process.env.NODE_ENV !== 'production',
+      ...config,
+    };
+  }
+
+  /**
+   * Execute HTTP request with retry logic and interceptors
+   */
+  async request<T>(requestConfig: RequestConfig): Promise<T> {
+    const { retryAttempts = 3, retryDelay = 1000 } = this.config;
+    let lastError: Error | undefined;
+
+    for (let attempt = 0; attempt < retryAttempts; attempt++) {
+      try {
+        // Apply request interceptors
+        const enhancedConfig = await this.applyRequestInterceptors(requestConfig);
+
+        // Execute request
+        const response = await this.executeRequest<T>(enhancedConfig);
+
+        // Apply response interceptors
+        return await this.applyResponseInterceptors(response);
+      } catch (error) {
+        lastError = error as Error;
+
+        // Check if error is retryable
+        if (!this.isRetryableError(error) || attempt === retryAttempts - 1) {
+          throw this.enhanceError(error);
+        }
+
+        // Wait before retry with exponential backoff
+        const delay = retryDelay * Math.pow(2, attempt);
+        this.log(`Request failed, retrying in ${delay}ms (attempt ${attempt + 1}/${retryAttempts})`);
+        await this.sleep(delay);
+      }
+    }
+
+    throw this.enhanceError(lastError!);
+  }
+
+  /**
+   * Apply request interceptors (authentication, logging, etc.)
+   */
+  private async applyRequestInterceptors(config: RequestConfig): Promise<RequestConfig> {
+    const headers = { ...config.headers };
+
+    // Add authentication
+    const apiKey = await this.getApiKey();
+    if (apiKey) {
+      headers['X-API-Key'] = apiKey;
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    // Add custom headers
+    if (this.config.headers) {
+      Object.assign(headers, this.config.headers);
+    }
+
+    // Log request
+    this.log(`${config.method} ${config.url}`, config.params || config.data);
+
+    return {
+      ...config,
+      headers,
+    };
+  }
+
+  /**
+   * Apply response interceptors
+   */
+  private async applyResponseInterceptors<T>(response: T): Promise<T> {
+    this.log('Response received:', response);
+    return response;
+  }
+
+  /**
+   * Get API key from credential provider or config
+   */
+  private async getApiKey(): Promise<string | undefined> {
+    if (this.config.credentialProvider) {
+      return await this.config.credentialProvider.getApiKey();
+    }
+    return this.config.apiKey;
+  }
+
+  /**
+   * Execute the actual HTTP request
+   * This will be implemented using the generated fetch client
+   */
+  private async executeRequest<T>(config: RequestConfig): Promise<T> {
+    const url = new URL(config.url, this.config.baseUrl);
+    
+    // Add query parameters
+    if (config.params) {
+      Object.entries(config.params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          url.searchParams.append(key, String(value));
+        }
+      });
+    }
+
+    const response = await fetch(url.toString(), {
+      method: config.method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...config.headers,
+      },
+      body: config.data ? JSON.stringify(config.data) : undefined,
+      signal: AbortSignal.timeout(this.config.timeout || 30000),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Check if error is retryable
+   */
+  private isRetryableError(error: any): boolean {
+    // Retry on network errors or 5xx server errors
+    if (error.name === 'AbortError') return false; // Don't retry timeouts
+    if (error.message?.includes('fetch failed')) return true;
+    if (error.status >= 500 && error.status < 600) return true;
+    if (error.status === 429) return true; // Rate limit
+    return false;
+  }
+
+  /**
+   * Enhance error with additional context
+   */
+  private enhanceError(error: any): Error {
+    if (error instanceof Error) {
+      return new Error(`API Request Failed: ${error.message}`);
+    }
+    return new Error('API Request Failed: Unknown error');
+  }
+
+  /**
+   * Log message if logging is enabled
+   */
+  private log(message: string, ...args: any[]): void {
+    if (this.config.enableLogging) {
+      console.log(`[{PACKAGE_NAME}]`, message, ...args);
+    }
+  }
+
+  /**
+   * Sleep utility for retry delays
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}

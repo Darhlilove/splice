@@ -1,0 +1,60 @@
+/**
+ * SDK Logger
+ * Configurable logging utility for debugging
+ */
+
+export enum LogLevel {
+  DEBUG = 0,
+  INFO = 1,
+  WARN = 2,
+  ERROR = 3,
+  NONE = 4,
+}
+
+export class Logger {
+  private static instance: Logger;
+  private logLevel: LogLevel;
+  private prefix: string;
+
+  private constructor(prefix: string = '[{PACKAGE_NAME}]', logLevel: LogLevel = LogLevel.WARN) {
+    this.prefix = prefix;
+    this.logLevel = logLevel;
+  }
+
+  static getInstance(): Logger {
+    if (!Logger.instance) {
+      Logger.instance = new Logger();
+    }
+    return Logger.instance;
+  }
+
+  setLogLevel(level: LogLevel): void {
+    this.logLevel = level;
+  }
+
+  debug(message: string, ...args: any[]): void {
+    if (this.logLevel <= LogLevel.DEBUG) {
+      console.debug(`${this.prefix} [DEBUG]`, message, ...args);
+    }
+  }
+
+  info(message: string, ...args: any[]): void {
+    if (this.logLevel <= LogLevel.INFO) {
+      console.info(`${this.prefix} [INFO]`, message, ...args);
+    }
+  }
+
+  warn(message: string, ...args: any[]): void {
+    if (this.logLevel <= LogLevel.WARN) {
+      console.warn(`${this.prefix} [WARN]`, message, ...args);
+    }
+  }
+
+  error(message: string, ...args: any[]): void {
+    if (this.logLevel <= LogLevel.ERROR) {
+      console.error(`${this.prefix} [ERROR]`, message, ...args);
+    }
+  }
+}
+
+export const logger = Logger.getInstance();

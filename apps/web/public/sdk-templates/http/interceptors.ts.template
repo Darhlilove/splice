@@ -1,0 +1,103 @@
+/**
+ * HTTP Interceptors
+ * Request/response interceptors for authentication, logging, and error handling
+ */
+
+export interface RequestInterceptor {
+  onRequest: (config: RequestConfig) => Promise<RequestConfig> | RequestConfig;
+}
+
+export interface ResponseInterceptor {
+  onResponse: <T>(response: T) => Promise<T> | T;
+  onError?: (error: any) => Promise<any> | any;
+}
+
+export interface RequestConfig {
+  method: string;
+  url: string;
+  headers?: Record<string, string>;
+  params?: Record<string, any>;
+  data?: any;
+}
+
+/**
+ * Authentication Interceptor
+ * Automatically adds API key to requests
+ */
+export class AuthInterceptor implements RequestInterceptor {
+  constructor(private getApiKey: () => Promise<string | undefined>) {}
+
+  async onRequest(config: RequestConfig): Promise<RequestConfig> {
+    const apiKey = await this.getApiKey();
+    
+    if (apiKey) {
+      config.headers = {
+        ...config.headers,
+        'X-API-Key': apiKey,
+        'Authorization': `Bearer ${apiKey}`,
+      };
+    }
+
+    return config;
+  }
+}
+
+/**
+ * Logging Interceptor
+ * Logs requests and responses for debugging
+ */
+export class LoggingInterceptor implements RequestInterceptor, ResponseInterceptor {
+  constructor(private enabled: boolean = process.env.NODE_ENV !== 'production') {}
+
+  onRequest(config: RequestConfig): RequestConfig {
+    if (this.enabled) {
+      console.log(`[{PACKAGE_NAME}] ${config.method} ${config.url}`, config.data || config.params);
+    }
+    return config;
+  }
+
+  onResponse<T>(response: T): T {
+    if (this.enabled) {
+      console.log('[{PACKAGE_NAME}] Response:', response);
+    }
+    return response;
+  }
+
+  onError(error: any): any {
+    if (this.enabled) {
+      console.error('[{PACKAGE_NAME}] Error:', error);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Error Enhancement Interceptor
+ * Enhances errors with additional context
+ */
+export class ErrorInterceptor implements ResponseInterceptor {
+  onResponse<T>(response: T): T {
+    return response;
+  }
+
+  onError(error: any): any {
+    // Enhance error with additional context
+    const enhancedError = new Error(
+      error.message ? `API Error: ${error.message}` : 'API Request Failed'
+    );
+
+    // Preserve stack trace
+    if (error.stack) {
+      enhancedError.stack = error.stack;
+    }
+
+    // Add additional properties
+    Object.assign(enhancedError, {
+      status: error.status,
+      statusText: error.statusText,
+      originalError: error,
+    });
+
+    throw enhancedError;
+  }
+}

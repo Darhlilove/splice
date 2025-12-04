@@ -1,0 +1,90 @@
+/**
+ * Custom Error Classes
+ * Enhanced error types for better error handling
+ */
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status?: number,
+    public statusText?: string,
+    public response?: any
+  ) {
+    super(message);
+    this.name = 'ApiError';
+    
+    // Maintains proper stack trace for where our error was thrown (only available on V8)
+    if (typeof (Error as any).captureStackTrace === 'function') {
+      (Error as any).captureStackTrace(this, ApiError);
+    }
+  }
+}
+
+export class NetworkError extends ApiError {
+  constructor(message: string = 'Network request failed') {
+    super(message);
+    this.name = 'NetworkError';
+  }
+}
+
+export class AuthenticationError extends ApiError {
+  constructor(message: string = 'Authentication failed', status: number = 401) {
+    super(message, status);
+    this.name = 'AuthenticationError';
+  }
+}
+
+export class ValidationError extends ApiError {
+  constructor(
+    message: string = 'Validation failed',
+    public errors?: Record<string, string[]>
+  ) {
+    super(message, 400);
+    this.name = 'ValidationError';
+  }
+}
+
+export class NotFoundError extends ApiError {
+  constructor(message: string = 'Resource not found') {
+    super(message, 404);
+    this.name = 'NotFoundError';
+  }
+}
+
+export class ServerError extends ApiError {
+  constructor(message: string = 'Internal server error') {
+    super(message, 500);
+    this.name = 'ServerError';
+  }
+}
+
+/**
+ * Parse error from response
+ */
+export function parseError(error: any): ApiError {
+  if (error instanceof ApiError) {
+    return error;
+  }
+
+  const status = error?.status || error?.response?.status;
+  const message = error?.message || error?.response?.data?.message || 'An error occurred';
+
+  switch (status) {
+    case 401:
+    case 403:
+      return new AuthenticationError(message, status);
+    case 404:
+      return new NotFoundError(message);
+    case 400:
+      return new ValidationError(message, error?.response?.data?.errors);
+    case 500:
+    case 502:
+    case 503:
+      return new ServerError(message);
+    default:
+      if (!status) {
+        return new NetworkError(message);
+      }
+      return new ApiError(message, status);
+  }
+}

@@ -9,6 +9,7 @@ import * as path from "path";
 import archiver from "archiver";
 import { SDKConfigValidator } from "./sdk-config-validator.js";
 import { ReadmeGenerator } from "./readme-generator.js";
+import { SDKEnhancer } from "./sdk-enhancer.js";
 const execAsync = promisify(exec);
 /**
  * SDK Generator class
@@ -21,6 +22,7 @@ export class SDKGenerator {
         this.GENERATION_TIMEOUT_MS = 60000; // 60 seconds
         this.configValidator = new SDKConfigValidator();
         this.readmeGenerator = new ReadmeGenerator();
+        this.sdkEnhancer = new SDKEnhancer();
         this.openAPIGeneratorAvailable = null;
     }
     /**
@@ -229,7 +231,19 @@ For more information, visit:
                 progress: 85,
                 message: "README generated",
             });
-            // Stage 3: Package (85-100%)
+            // Enhance SDK with environment variables, credential providers, etc.
+            updateProgress({
+                stage: "generating",
+                progress: 86,
+                message: "Enhancing SDK with security best practices...",
+            });
+            await this.sdkEnhancer.enhanceSDK(outputPath, spec, config);
+            updateProgress({
+                stage: "generating",
+                progress: 87,
+                message: "SDK enhancement complete",
+            });
+            // Stage 3: Package (87-100%)
             updateProgress({
                 stage: "packaging",
                 progress: 88,

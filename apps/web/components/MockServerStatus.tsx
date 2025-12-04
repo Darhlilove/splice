@@ -22,6 +22,7 @@ export function MockServerStatus() {
   const { state, setMockServerStatus } = useWorkflow();
   const { mockServerInfo, setMockServerInfo } = useMockServer();
   const [isCopying, setIsCopying] = React.useState(false);
+  const [isCopyingApiKey, setIsCopyingApiKey] = React.useState(false);
   const [isActionLoading, setIsActionLoading] = React.useState(false);
 
   // Poll for status updates - Requirement 4.4
@@ -83,6 +84,21 @@ export function MockServerStatus() {
     } catch (error) {
       console.error("Failed to copy URL:", error);
       toast.error("Failed to copy URL");
+    }
+  };
+
+  // Handle copy API key to clipboard
+  const handleCopyApiKey = async () => {
+    if (!mockServerInfo?.apiKey) return;
+
+    try {
+      await navigator.clipboard.writeText(mockServerInfo.apiKey);
+      setIsCopyingApiKey(true);
+      toast.success("API key copied to clipboard");
+      setTimeout(() => setIsCopyingApiKey(false), 2000);
+    } catch (error) {
+      console.error("Failed to copy API key:", error);
+      toast.error("Failed to copy API key");
     }
   };
 
@@ -217,6 +233,24 @@ export function MockServerStatus() {
           </TooltipContent>
         </Tooltip>
 
+        {/* API Key Badge - Show if auth is required */}
+        {isRunning && mockServerInfo?.requiresAuth && mockServerInfo?.apiKey && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge
+                variant="outline"
+                className="bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700 text-xs h-7 px-2.5 rounded-lg"
+              >
+                <span className="mr-1">🔐</span>
+                <span className="hidden sm:inline font-medium">Auth Required</span>
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>This API requires authentication</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+
         {/* Server URL - Requirement 4.2 - Hidden on mobile */}
         {isRunning && serverUrl && (
           <>
@@ -269,6 +303,56 @@ export function MockServerStatus() {
                 <p>{isCopying ? "Copied!" : "Copy URL"}</p>
               </TooltipContent>
             </Tooltip>
+
+            {/* Copy API Key Button - Show if auth is required */}
+            {mockServerInfo?.requiresAuth && mockServerInfo?.apiKey && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 rounded-full"
+                    onClick={handleCopyApiKey}
+                    disabled={isCopyingApiKey}
+                  >
+                    {isCopyingApiKey ? (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={1.5}
+                        stroke="currentColor"
+                        className="w-4 h-4"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M4.5 12.75l6 6 9-13.5"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={1.5}
+                        stroke="currentColor"
+                        className="w-4 h-4"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"
+                        />
+                      </svg>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isCopyingApiKey ? "Copied!" : "Copy API Key"}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
           </>
         )}
 

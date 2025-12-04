@@ -28,11 +28,20 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Eye, EyeOff, Lock, Trash2 } from "lucide-react";
 
+import { Checkbox } from "@/components/ui/checkbox";
+import { MockServerInfo } from "@/contexts/mock-server-context";
+import { Check, X, AlertCircle } from "lucide-react";
+
 interface AuthenticationSectionProps {
   endpoint: Endpoint;
   securitySchemes?: Record<string, SecurityScheme>;
   value: AuthConfig;
   onChange: (auth: AuthConfig) => void;
+  autoFillApiKey?: boolean;
+  onAutoFillChange?: (checked: boolean) => void;
+  isMockMode?: boolean;
+  mockServerInfo?: MockServerInfo | null;
+  isApiKeyValid?: boolean;
 }
 
 /**
@@ -103,6 +112,11 @@ export function AuthenticationSection({
   securitySchemes,
   value,
   onChange,
+  autoFillApiKey,
+  onAutoFillChange,
+  isMockMode,
+  mockServerInfo,
+  isApiKeyValid,
 }: AuthenticationSectionProps) {
   const [showPassword, setShowPassword] = React.useState(false);
   const [showToken, setShowToken] = React.useState(false);
@@ -146,6 +160,43 @@ export function AuthenticationSection({
     }
   }, [authType, value.type, securityScheme, onChange]);
 
+  // Handle auto-fill logic
+  React.useEffect(() => {
+    if (!isMockMode || !mockServerInfo?.requiresAuth || !mockServerInfo?.apiKey) {
+      return;
+    }
+
+    if (autoFillApiKey) {
+      if (authType === "apiKey") {
+        // Only update if not already set to avoid infinite loop
+        if (value.apiKey !== mockServerInfo.apiKey) {
+          onChange({
+            type: "apiKey",
+            apiKey: mockServerInfo.apiKey,
+            apiKeyName: securityScheme.name || "api_key",
+            apiKeyLocation: securityScheme.in || "header",
+          });
+        }
+      } else if (authType === "bearer" || authType === "oauth2") {
+        // Only update if not already set
+        if (value.bearerToken !== mockServerInfo.apiKey) {
+          onChange({
+            type: authType,
+            bearerToken: mockServerInfo.apiKey,
+          });
+        }
+      }
+    } else {
+      // If unchecked, we might want to clear the auto-filled value
+      // But only if it matches the mock key (to avoid clearing user's manual input)
+      if (authType === "apiKey" && value.apiKey === mockServerInfo.apiKey) {
+        onChange({ ...value, apiKey: "" });
+      } else if ((authType === "bearer" || authType === "oauth2") && value.bearerToken === mockServerInfo.apiKey) {
+        onChange({ ...value, bearerToken: "" });
+      }
+    }
+  }, [autoFillApiKey, isMockMode, mockServerInfo, authType, securityScheme, onChange, value]);
+
   /**
    * Handle clearing credentials
    */
@@ -158,6 +209,10 @@ export function AuthenticationSection({
         apiKeyLocation: securityScheme.in || "header",
       }),
     });
+    // Also uncheck auto-fill if it was checked
+    if (onAutoFillChange) {
+      onAutoFillChange(false);
+    }
   };
 
   return (
@@ -186,28 +241,77 @@ export function AuthenticationSection({
         {/* API Key Authentication */}
         {authType === "apiKey" && (
           <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Badge variant="outline">
-                {securityScheme.in?.toUpperCase() || "HEADER"}
-              </Badge>
-              <span>
-                Key name: <code className="text-xs">{securityScheme.name}</code>
-              </span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Badge variant="outline">
+                  {securityScheme.in?.toUpperCase() || "HEADER"}
+                </Badge>
+                <span>
+                  Key name: <code className="text-xs">{securityScheme.name}</code>
+                </span>
+              </div>
+
+              {/* Auto-fill Checkbox */}
+              {isMockMode && mockServerInfo?.requiresAuth && (
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="auto-fill-api-key"
+                    checked={autoFillApiKey}
+                    onCheckedChange={(checked) => onAutoFillChange?.(checked as boolean)}
+                  />
+                  <Label
+                    htmlFor="auto-fill-api-key"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Auto-fill Mock Key
+                  </Label>
+                </div>
+              )}
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="api-key">API Key</Label>
-              <Input
-                id="api-key"
-                type="text"
-                placeholder="Enter your API key"
-                value={value.apiKey || ""}
-                onChange={(e) =>
-                  onChange({
-                    ...value,
-                    apiKey: e.target.value,
-                  })
-                }
-              />
+              <div className="relative">
+                <Input
+                  id="api-key"
+                  type="text"
+                  placeholder="Enter your API key"
+                  value={value.apiKey || ""}
+                  onChange={(e) =>
+                    onChange({
+                      ...value,
+                      apiKey: e.target.value,
+                    })
+                  }
+                  className={isMockMode && mockServerInfo?.requiresAuth ? (isApiKeyValid ? "border-green-500 pr-10" : "border-red-500 pr-10") : ""}
+                />
+
+                {/* Validation Feedback Icon */}
+                {isMockMode && mockServerInfo?.requiresAuth && value.apiKey && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {isApiKeyValid ? (
+                      <Check className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <X className="h-4 w-4 text-red-500" />
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Validation Message */}
+              {isMockMode && mockServerInfo?.requiresAuth && value.apiKey && !isApiKeyValid && (
+                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3" />
+                  Key does not match the generated mock server key
+                </p>
+              )}
+
+              {isMockMode && mockServerInfo?.requiresAuth && value.apiKey && isApiKeyValid && (
+                <p className="text-xs text-green-500 flex items-center gap-1 mt-1">
+                  <Check className="h-3 w-3" />
+                  Valid mock server key
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -310,14 +414,36 @@ export function AuthenticationSection({
         {/* OAuth2 Authentication */}
         {authType === "oauth2" && (
           <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Badge variant="outline">OAUTH2</Badge>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Badge variant="outline">OAUTH2</Badge>
+              </div>
+
+              {/* Auto-fill Checkbox */}
+              {isMockMode && mockServerInfo?.requiresAuth && (
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="auto-fill-oauth"
+                    checked={autoFillApiKey}
+                    onCheckedChange={(checked) => onAutoFillChange?.(checked as boolean)}
+                  />
+                  <Label
+                    htmlFor="auto-fill-oauth"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Auto-fill Mock Key
+                  </Label>
+                </div>
+              )}
             </div>
+
             <div className="rounded-md bg-muted p-4 text-sm">
               <p className="text-muted-foreground">
-                OAuth2 authentication requires a separate authorization flow.
-                Please obtain an access token through your OAuth2 provider and
-                enter it below.
+                {isMockMode ? (
+                  "In mock mode, you can use the generated API key as your OAuth2 access token."
+                ) : (
+                  "OAuth2 authentication requires a separate authorization flow. Please obtain an access token through your OAuth2 provider and enter it below."
+                )}
               </p>
             </div>
             <div className="space-y-2">
@@ -334,8 +460,20 @@ export function AuthenticationSection({
                       bearerToken: e.target.value,
                     })
                   }
-                  className="pr-10"
+                  className={`pr-10 ${isMockMode && mockServerInfo?.requiresAuth ? (isApiKeyValid ? "border-green-500" : "border-red-500") : ""}`}
                 />
+
+                {/* Validation Feedback Icon */}
+                {isMockMode && mockServerInfo?.requiresAuth && value.bearerToken && (
+                  <div className="absolute right-10 top-1/2 -translate-y-1/2">
+                    {isApiKeyValid ? (
+                      <Check className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <X className="h-4 w-4 text-red-500" />
+                    )}
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={() => setShowToken(!showToken)}
@@ -348,6 +486,21 @@ export function AuthenticationSection({
                   )}
                 </button>
               </div>
+
+              {/* Validation Message */}
+              {isMockMode && mockServerInfo?.requiresAuth && value.bearerToken && !isApiKeyValid && (
+                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3" />
+                  Key does not match the generated mock server key
+                </p>
+              )}
+
+              {isMockMode && mockServerInfo?.requiresAuth && value.bearerToken && isApiKeyValid && (
+                <p className="text-xs text-green-500 flex items-center gap-1 mt-1">
+                  <Check className="h-3 w-3" />
+                  Valid mock server key
+                </p>
+              )}
             </div>
           </div>
         )}

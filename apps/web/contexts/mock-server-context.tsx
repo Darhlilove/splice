@@ -12,6 +12,8 @@ export interface MockServerInfo {
   status: "running" | "stopped" | "starting" | "error";
   startedAt: Date;
   error?: string;
+  apiKey?: string; // Generated API key if auth is required
+  requiresAuth?: boolean; // Whether this spec requires authentication
 }
 
 /**

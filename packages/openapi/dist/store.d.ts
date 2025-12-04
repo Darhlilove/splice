@@ -3,6 +3,7 @@
  * Uses Redis for persistence if configured, otherwise falls back to in-memory Map
  */
 import type { ParsedSpec } from "./types.js";
+import Redis from "ioredis";
 interface StoredSpec {
     spec: ParsedSpec;
     originalSpec?: any;
@@ -13,6 +14,11 @@ interface StoredSpec {
         uploadedAt: string;
     };
 }
+/**
+ * Get the Redis client instance
+ * @returns The Redis client if configured, null otherwise
+ */
+export declare function getRedisClient(): Redis | null;
 /**
  * Generate a unique spec ID
  */

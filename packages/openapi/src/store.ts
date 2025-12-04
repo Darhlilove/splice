@@ -34,6 +34,14 @@ const EXPIRY_SECONDS = 24 * 60 * 60;
 const EXPIRY_MS = EXPIRY_SECONDS * 1000;
 
 /**
+ * Get the Redis client instance
+ * @returns The Redis client if configured, null otherwise
+ */
+export function getRedisClient(): Redis | null {
+  return redis;
+}
+
+/**
  * Generate a unique spec ID
  */
 export function generateSpecId(): string {

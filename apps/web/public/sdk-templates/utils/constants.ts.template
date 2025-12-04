@@ -1,0 +1,57 @@
+/**
+ * SDK Constants
+ * Shared constants used throughout the SDK
+ */
+
+export const SDK_VERSION = '{PACKAGE_VERSION}';
+export const SDK_NAME = '{PACKAGE_NAME}';
+export const API_VERSION = '{API_VERSION}';
+
+/**
+ * Default configuration values
+ */
+export const DEFAULT_TIMEOUT = 30000; // 30 seconds
+export const DEFAULT_RETRY_ATTEMPTS = 3;
+export const DEFAULT_RETRY_DELAY = 1000; // 1 second
+
+/**
+ * HTTP Headers
+ */
+export const HEADERS = {
+  CONTENT_TYPE: 'Content-Type',
+  AUTHORIZATION: 'Authorization',
+  API_KEY: 'X-API-Key',
+  USER_AGENT: 'User-Agent',
+} as const;
+
+/**
+ * Content Types
+ */
+export const CONTENT_TYPES = {
+  JSON: 'application/json',
+  FORM: 'application/x-www-form-urlencoded',
+  MULTIPART: 'multipart/form-data',
+} as const;
+
+/**
+ * HTTP Methods
+ */
+export const HTTP_METHODS = {
+  GET: 'GET',
+  POST: 'POST',
+  PUT: 'PUT',
+  PATCH: 'PATCH',
+  DELETE: 'DELETE',
+} as const;
+
+/**
+ * Error Messages
+ */
+export const ERROR_MESSAGES = {
+  NETWORK_ERROR: 'Network request failed. Please check your connection.',
+  TIMEOUT_ERROR: 'Request timed out. Please try again.',
+  AUTH_ERROR: 'Authentication failed. Please check your credentials.',
+  NOT_FOUND: 'The requested resource was not found.',
+  SERVER_ERROR: 'Server error occurred. Please try again later.',
+  VALIDATION_ERROR: 'Validation failed. Please check your input.',
+} as const;

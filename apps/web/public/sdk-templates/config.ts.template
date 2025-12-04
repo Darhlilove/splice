@@ -1,0 +1,57 @@
+/**
+ * SDK Configuration
+ * Provides centralized configuration management with environment variable support
+ */
+
+export interface SdkConfig {
+  /**
+   * Base URL for API requests
+   * Can be set via environment variable: {PACKAGE_NAME}_BASE_URL
+   */
+  baseUrl: string;
+
+  /**
+   * API key for authentication (optional)
+   * Can be set via environment variable: {PACKAGE_NAME}_API_KEY
+   */
+  apiKey?: string;
+
+  /**
+   * Request timeout in milliseconds
+   * @default 30000
+   */
+  timeout?: number;
+
+  /**
+   * Additional headers to include in all requests
+   */
+  headers?: Record<string, string>;
+}
+
+/**
+ * Create SDK configuration with environment variable fallbacks
+ * @param config - Partial configuration object
+ * @returns Complete SDK configuration
+ * 
+ * @example
+ * ```typescript
+ * // Using environment variables (recommended for production)
+ * const config = createConfig();
+ * 
+ * // Overriding specific values
+ * const config = createConfig({
+ *   baseUrl: 'https://api.example.com',
+ *   timeout: 60000
+ * });
+ * ```
+ */
+export function createConfig(config?: Partial<SdkConfig>): SdkConfig {
+  const envPrefix = '{PACKAGE_NAME_UPPER}';
+  
+  return {
+    baseUrl: config?.baseUrl || process.env[`${envPrefix}_BASE_URL`] || '',
+    apiKey: config?.apiKey || process.env[`${envPrefix}_API_KEY`],
+    timeout: config?.timeout || 30000,
+    headers: config?.headers || {},
+  };
+}

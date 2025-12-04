@@ -10,6 +10,10 @@
 
 import { spawn, ChildProcess, execSync } from "child_process";
 import * as net from "net";
+import { generateApiKey } from "./utils/key-generator.js";
+import { storeApiKey, deleteApiKey } from "./utils/api-key-store.js";
+import type { ParsedSpec } from "./types.js";
+import { getSpec } from "./store.js";
 
 export interface MockServerConfig {
   specPath: string;
@@ -24,6 +28,8 @@ export interface MockServerInfo {
   status: "running" | "stopped" | "starting" | "error";
   startedAt: Date;
   error?: string;
+  apiKey?: string; // Generated API key if auth is required
+  requiresAuth?: boolean; // Whether this spec requires authentication
 }
 
 export class MockServerManager {
@@ -66,6 +72,33 @@ export class MockServerManager {
       "pnpm: pnpm add -g @stoplight/prism-cli\n\n" +
       "For more information, visit: https://docs.stoplight.io/docs/prism/674b27b261c3c-prism-overview"
     );
+  }
+
+  /**
+   * Check if a spec requires API key authentication
+   */
+  private async requiresApiKeyAuth(specId: string): Promise<boolean> {
+    try {
+      const storedSpec = await getSpec(specId);
+      if (!storedSpec) {
+        return false;
+      }
+
+      const spec = storedSpec.spec;
+      const securitySchemes = spec.securitySchemes;
+
+      if (!securitySchemes) {
+        return false;
+      }
+
+      // Check if any security scheme is of type 'apiKey' or 'http' (bearer)
+      return Object.values(securitySchemes).some(
+        (scheme) => scheme.type === "apiKey" || scheme.type === "http"
+      );
+    } catch (error) {
+      console.error(`[MockManager] Error checking auth for spec ${specId}:`, error);
+      return false;
+    }
   }
 
   /**
@@ -134,6 +167,17 @@ export class MockServerManager {
           // Store process reference
           this.processes.set(specId, process);
 
+          // Check if spec requires authentication
+          const requiresAuth = await this.requiresApiKeyAuth(specId);
+          let apiKey: string | undefined;
+
+          if (requiresAuth) {
+            // Generate and store API key
+            apiKey = generateApiKey();
+            await storeApiKey(specId, apiKey);
+            console.log(`[MockManager] Generated API key for spec: ${specId}`);
+          }
+
           // Create server info
           const serverInfo: MockServerInfo = {
             url: `http://${host}:${port}`,
@@ -141,6 +185,8 @@ export class MockServerManager {
             pid: process.pid || 0,
             status: "running",
             startedAt: new Date(),
+            apiKey,
+            requiresAuth,
           };
 
           this.servers.set(specId, serverInfo);
@@ -212,9 +258,16 @@ export class MockServerManager {
         reject(new Error("Server stop timeout - forced kill"));
       }, 2000);
 
-      process.once("exit", () => {
+      process.once("exit", async () => {
         clearTimeout(timeout);
         this.processes.delete(specId);
+
+        // Clean up API key from Redis if it exists
+        if (serverInfo.apiKey) {
+          await deleteApiKey(specId);
+          console.log(`[MockManager] Deleted API key for spec: ${specId}`);
+        }
+
         this.servers.set(specId, {
           ...serverInfo,
           status: "stopped",

@@ -19,6 +19,8 @@ export interface MockServerInfo {
     status: "running" | "stopped" | "starting" | "error";
     startedAt: Date;
     error?: string;
+    apiKey?: string;
+    requiresAuth?: boolean;
 }
 export declare class MockServerManager {
     private servers;
@@ -35,6 +37,10 @@ export declare class MockServerManager {
      * Get Prism installation instructions
      */
     getPrismInstallationInstructions(): string;
+    /**
+     * Check if a spec requires API key authentication
+     */
+    private requiresApiKeyAuth;
     /**
      * Start a mock server for the given spec
      */

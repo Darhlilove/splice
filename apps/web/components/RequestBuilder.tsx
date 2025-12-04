@@ -18,13 +18,11 @@ import { PresetManager } from "@/components/PresetManager";
 import { ResponseViewer } from "@/components/ResponseViewer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { executeRequestWithState } from "@/lib/request-executor";
 import { Loader2, Play, AlertCircle, RefreshCw, Server } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useMockServer } from "@/contexts/mock-server-context";
 
@@ -136,6 +134,27 @@ export function RequestBuilder({
       setContentType("application/json");
     }
   }, [endpoint]);
+
+  // State for auto-fill API key checkbox
+  const [autoFillApiKey, setAutoFillApiKey] = React.useState(false);
+
+  // Validate API key matches the generated one
+  const isApiKeyValid = React.useMemo(() => {
+    if (!isMockMode || !mockServerInfo?.requiresAuth || !mockServerInfo?.apiKey) {
+      return true; // No validation needed if not in auth mode
+    }
+
+    if (authentication.type === "apiKey" && authentication.apiKey) {
+      return authentication.apiKey === mockServerInfo.apiKey;
+    }
+
+    if ((authentication.type === "bearer" || authentication.type === "oauth2") && authentication.bearerToken) {
+      return authentication.bearerToken === mockServerInfo.apiKey;
+    }
+
+    return false; // Invalid if auth required but no key provided
+  }, [isMockMode, mockServerInfo?.requiresAuth, mockServerInfo?.apiKey, authentication]);
+
 
   // Create parameter locations map for RequestPreview
   const parameterLocations = React.useMemo(() => {
@@ -524,6 +543,11 @@ export function RequestBuilder({
         securitySchemes={securitySchemes}
         value={authentication}
         onChange={handleAuthChange}
+        autoFillApiKey={autoFillApiKey}
+        onAutoFillChange={setAutoFillApiKey}
+        isMockMode={isMockMode}
+        mockServerInfo={mockServerInfo}
+        isApiKeyValid={isApiKeyValid}
       />
 
       {/* Request Preview */}
